@@ -1,0 +1,58 @@
+{
+  "camera": "atras do carro (az 0), girando para o lado direito do carro",
+  "canvas": [
+    2100,
+    800
+  ],
+  "chao_y": 735,
+  "direcoes": [
+    {
+      "azimute": 0,
+      "nome": "traseira",
+      "arquivo": "png/car_000_traseira.png",
+      "origem": "arte/referencias/carro-honda-laranja/originais/traseira.jpg"
+    },
+    {
+      "azimute": 45,
+      "nome": "traseira-3-4-direita",
+      "arquivo": "png/car_045_traseira-3-4-direita.png",
+      "origem": "arte/carro-honda-laranja/ajustados/traseira-3-4-direita.jpg"
+    },
+    {
+      "azimute": 90,
+      "nome": "lateral-direita",
+      "arquivo": "png/car_090_lateral-direita.png",
+      "origem": "arte/carro-honda-laranja/ajustados/lateral-direita.png"
+    },
+    {
+      "azimute": 135,
+      "nome": "frente-3-4-direita",
+      "arquivo": "png/car_135_frente-3-4-direita.png",
+      "origem": "arte/carro-honda-laranja/ajustados/frente-3-4-direita.png"
+    },
+    {
+      "azimute": 180,
+      "nome": "frente",
+      "arquivo": "png/car_180_frente.png",
+      "origem": "arte/referencias/carro-honda-laranja/originais/frente.jpg"
+    },
+    {
+      "azimute": 225,
+      "nome": "frente-3-4-esquerda",
+      "arquivo": "png/car_225_frente-3-4-esquerda.png",
+      "origem": "arte/carro-honda-laranja/ajustados/frente-3-4-esquerda.png"
+    },
+    {
+      "azimute": 270,
+      "nome": "lateral-esquerda",
+      "arquivo": "png/car_270_lateral-esquerda.png",
+      "origem": "arte/carro-honda-laranja/ajustados/lateral-esquerda.png"
+    },
+    {
+      "azimute": 315,
+      "nome": "traseira-3-4-esquerda",
+      "arquivo": "png/car_315_traseira-3-4-esquerda.png",
+      "origem": "arte/carro-honda-laranja/ajustados/traseira-3-4-esquerda.jpg"
+    }
+  ]
+}
