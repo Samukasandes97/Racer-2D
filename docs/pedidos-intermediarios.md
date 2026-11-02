@@ -16,3 +16,9 @@ Texto base (colar em todos):
 - 337,5°: "visto de trás, girado 22,5° para o lado esquerdo (quase de trás)"
 
 Depois de gerar: enviar para o Claude, que confere consistência (roda, emblema, faixa), recorta o fundo, alinha escala e chão e inclui no giro (16 direções).
+
+## Referência de pose (do vídeo novo)
+Pasta: `arte/carro-honda-laranja/referencias-de-pose/` (um arquivo por ângulo + `folha-de-poses.png`).
+Anexar, junto com as imagens de `ajustados/`, o `pose_<ângulo>.png` do ângulo pedido e acrescentar ao pedido:
+"Copiar SOMENTE a pose e o ângulo da imagem de pose. Ignorar o estilo 3D realista, o fundo cinza, as rodas, os textos (PRO TURBO RB26, TUB26), a faixa lateral preta e a barra frontal. O visual do carro vem das imagens em pixel-art com contorno."
+Observação: `pose_112.5` e `pose_157.5` são o espelho de 247.5 e 202.5 (o vídeo não chega a esses ângulos), então os textos aparecem invertidos; ignorar.
