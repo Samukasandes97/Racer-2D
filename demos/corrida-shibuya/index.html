@@ -213,44 +213,62 @@ function update(dt){
 }
 
 
-// ---------- motor VTEC: SOMENTE a gravacao enviada pelo Samuel ----------
-// O loop (trecho estavel, tom base 188 Hz) toca sempre; a velocidade de reproducao segue a rotacao do carro.
-const KMH=180;                                    // velocidade maxima do jogo por enquanto
+// ---------- motor VTEC: SOMENTE trechos da gravacao original enviada pelo Samuel ----------
+// Cada situacao do carro toca o trecho certo do audio original (sem sintese):
+//  idle = ronco baixo | acc = motor firme em alta | lim = corte de giro | dec = tirou o pe/freio-motor
+//  shift = embreagem + troca (queda de giro) | blip = reducao de marcha
+const KMH=180;                                    // velocidade maxima por enquanto
 const GEARMAX=[40,70,102,138,183];                // km/h na rotacao maxima de cada marcha
-let gear=0,rpm=900,vt=0,shiftT=0,thr=0,soundOn=true,AC=null,A=null;
+let gear=0,rpm=900,shiftT=0,thr=0,soundOn=true,AC=null,A=null;const ev=[];
+const vkmh=()=>spd/MAXSPD*KMH;
 function engine(dt){
-  const v=spd/MAXSPD*KMH;
+  const v=vkmh();
   thr+=((key.a&&!key.b?1:0)-thr)*Math.min(1,dt*8);
   if(shiftT>0)shiftT-=dt;
   else{
     const r=v/GEARMAX[gear]*8400;
-    if(r>8000&&gear<4){gear++;shiftT=.2}
-    else if(gear>0&&r<3200){gear--;shiftT=.15}
+    if(r>7800&&gear<4){gear++;shiftT=.6;ev.push('shift')}
+    else if(gear>0&&r<3200){gear--;shiftT=.35;ev.push('blip')}
   }
   const base=Math.max(900,v/GEARMAX[gear]*8400);
-  const target=shiftT>0?base*.82:(v<8&&key.a?3500:base);
-  rpm+=(target-rpm)*Math.min(1,dt*(thr>.5?12:5));
+  const target=(v<8&&key.a)?3500:base;
+  rpm+=(target-rpm)*Math.min(1,dt*(shiftT>0?7:(thr>.5?12:5)));
   rpm=clamp(rpm,850,8450);
-  vt+=(((thr>.4&&shiftT<=0&&(rpm>5600||(vt>.5&&rpm>5200)))?1:0)-vt)*Math.min(1,dt*10);
-  if(A&&A.smp)audioUpdate();
+  if(A&&A.ready)audioUpdate();
 }
 function initAudio(){
   if(AC){if(AC.state==='suspended')AC.resume();return}
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   try{AC=new C()}catch(e){return}
-  A={smp:null};
-  fetch('audio/vtec_loop.wav').then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{
-    const src=AC.createBufferSource();src.buffer=buf;src.loop=true;
-    const g=AC.createGain();g.gain.value=0;src.connect(g);g.connect(AC.destination);src.start();A.smp={src,g};
+  A={ready:false,L:{},B:{}};
+  const names=['idle','acc','lim','dec','shift','blip'];
+  Promise.all(names.map(n=>fetch('audio/'+n+'.wav').then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{A.B[n]=buf}))).then(()=>{
+    for(const n of ['idle','acc','lim','dec']){
+      const src=AC.createBufferSource();src.buffer=A.B[n];src.loop=true;
+      const g=AC.createGain();g.gain.value=0;src.connect(g);g.connect(AC.destination);src.start();A.L[n]={src,g};
+    }
+    A.ready=true;
   }).catch(()=>{});
 }
-function audioUpdate(){
-  const T=AC.currentTime,n=(rpm-900)/(8400-900);
-  A.smp.src.playbackRate.setTargetAtTime(.5+clamp(n,0,1),T,.05);   // 0,5x (marcha lenta) ate 1,5x (corte)
-  const vol=soundOn?(shiftT>0?.35:1)*(.3+.7*thr)*(.55+.45*clamp(n*1.5,0,1)):0;
-  A.smp.g.gain.setTargetAtTime(vol*.9,T,.05);
+function oneShot(n,vol){
+  const src=AC.createBufferSource();src.buffer=A.B[n];const g=AC.createGain();g.gain.value=vol;
+  src.connect(g);g.connect(AC.destination);src.start();
 }
-['pointerdown','keydown'].forEach(ev=>addEventListener(ev,initAudio));
+function audioUpdate(){
+  const T=AC.currentTime,n=clamp(rpm/8400,0,1),v=vkmh(),on=soundOn?1:0;
+  while(ev.length){const e=ev.shift();if(on)oneShot(e,e==='shift'?1.1:1.2)}
+  const t={idle:0,acc:0,lim:0,dec:0};
+  if(shiftT>0){}
+  else if(thr>.3){if(rpm>8200)t.lim=1;else t.acc=1}
+  else if(v>4)t.dec=1;
+  else t.idle=1;
+  const lv={idle:3.2,acc:1,lim:1,dec:1.3};
+  for(const k in t)A.L[k].g.gain.setTargetAtTime(t[k]*lv[k]*on,T,.03);
+  const ra=.5+.55*n;                               // acompanha a rotacao; perto de 1,0 = tom original
+  A.L.acc.src.playbackRate.setTargetAtTime(ra,T,.05);
+  A.L.dec.src.playbackRate.setTargetAtTime(Math.min(1.25,ra/.78),T,.05);
+}
+['pointerdown','keydown'].forEach(ev2=>addEventListener(ev2,initAudio));
 
 // ---------- desenho ----------
 const rect=(x,y,w,h)=>ctx.fillRect(Math.round(x),y,Math.max(1,Math.round(w)),h);
