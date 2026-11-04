@@ -1,0 +1,347 @@
+<title>Corrida Shibuya</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: palco 16:9 pixel-art em cima, controles de toque embaixo. Visual unico: noite chuvosa de Shibuya. */
+:root{
+  --bg:#080b18; --panel:#10152a; --fg:#e9ecff; --muted:#8c93b8; --line:#242b4d;
+  --neon:#ff4fa3; --cyan:#4fd8ff; --amber:#ffd24f;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow","Segoe UI",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;
+  padding-block:16px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:960px;margin:0 auto;display:grid;gap:12px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,6vw,40px);letter-spacing:.03em;text-transform:uppercase;margin:0;line-height:1}
+h1 b{color:var(--neon);font-weight:700}
+.sub{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.stage{position:relative;aspect-ratio:16/9;max-width:100%;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#0a0f24;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.hud{position:absolute;right:10px;top:8px;font-family:var(--mono);font-size:clamp(12px,2.6vw,18px);color:var(--fg);text-shadow:0 0 6px var(--neon);letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.hud small{color:var(--muted);font-size:.7em;margin-left:4px}
+.msg{position:absolute;left:10px;bottom:8px;font-family:var(--mono);font-size:12px;color:var(--muted);transition:opacity .5s}
+.pad{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pad .wide{grid-column:1/-1}
+button{font:inherit;font-weight:600;min-height:56px;padding:0 16px;border-radius:4px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
+button:active,button.on{background:var(--neon);color:#1a0612;border-color:var(--neon)}
+button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row button{min-height:44px;font-weight:500;font-size:14px;flex:1 1 140px}
+.row button.on{background:var(--cyan);border-color:var(--cyan);color:#04141a}
+.note{font-size:14px;color:var(--muted);margin:0;max-width:70ch}
+.note b{color:var(--fg);font-weight:600}
+@media (prefers-reduced-motion:reduce){.msg{transition:none}}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<div class="wrap">
+  <header>
+    <h1>Corrida <b>Shibuya</b></h1>
+    <span class="sub">protótipo da pista · câmera estilo Top Gear</span>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="c" aria-label="Carro laranja correndo numa rua de Shibuya à noite, na chuva"></canvas>
+    <div class="hud" id="hud">0<small>km/h</small></div>
+    <div class="msg" id="msg">◀ ▶ ou setas/A/D para guiar · acelera sozinho · ↓/S freia</div>
+  </div>
+
+  <div class="pad">
+    <button id="bl" aria-label="Virar para a esquerda">◀ Esquerda</button>
+    <button id="br" aria-label="Virar para a direita">Direita ▶</button>
+    <button id="bb" class="wide" aria-label="Frear">Frear</button>
+  </div>
+  <div class="row">
+    <button id="tf" class="on" aria-pressed="true">Filtro pixel-art</button>
+    <button id="tr" class="on" aria-pressed="true">Chuva</button>
+  </div>
+  <p class="note"><b>Como funciona:</b> a câmera fica fixa atrás do carro, como no Top Gear. A pista é desenhada em faixas que se entortam nas curvas e sobem e descem nas ladeiras. Os prédios, postes e placas são sprites que crescem ao chegar perto. O carro é a sua arte (traseira e 3/4); a cena foi desenhada por mim em código para seguir as suas referências de Shibuya.</p>
+</div>
+
+<script>
+// ---------- util ----------
+const W=480,H=270,HOR=135;
+const cv=document.getElementById('c');cv.width=W;cv.height=H;
+const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=false;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const hash=n=>{const s=Math.sin(n*127.1+311.7)*43758.5453;return s-Math.floor(s)};
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const NEON=['#ff4fa3','#b36bff','#4fd8ff','#ffd24f','#ff7a3a','#6bff9e','#ff3b3b'];
+const HAZE=[16,26,58];
+const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+
+// ---------- texturas (pixel-art gerado) ----------
+const FONT='"Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo","Noto Sans CJK JP",sans-serif';
+const SIGNS=['カラオケ','パチンコ','ラーメン','居酒屋','焼き鳥','餃子','コンビニ24H','SHIBUYA','109','薬局','BAR','寿司','CLOTHING','ファッション'];
+const VERT=['カラオケ','焼き鳥','ラーメン','餃子','居酒屋','1','カフェ'];
+function sign(g,x,y,w,h,txt,col,bg){
+  g.fillStyle=bg;g.fillRect(x,y,w,h);
+  g.strokeStyle=col;g.lineWidth=2;g.strokeRect(x+1,y+1,w-2,h-2);
+  g.fillStyle=col;g.font='bold '+Math.floor(h*.62)+'px '+FONT;g.textAlign='center';g.textBaseline='middle';
+  g.fillText(txt,x+w/2,y+h/2+1,w-6);
+}
+function building(seed,TW,TH){
+  const r=rng(seed),c=mk(TW,TH),g=c.getContext('2d');
+  const body=['#1b2135','#222a42','#171c2e','#262b3d'][r()*4|0];
+  g.fillStyle=body;g.fillRect(0,0,TW,TH);
+  g.fillStyle='rgba(255,255,255,.05)';g.fillRect(0,0,3,TH);
+  g.fillStyle='rgba(0,0,0,.3)';g.fillRect(TW-4,0,4,TH);
+  const shopH=70,top=TH-shopH,cols=7,cw=TW/cols,rows=Math.floor((top-8)/11);
+  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+    const v=r(),x=Math.floor(i*cw+4),y=8+j*11,w=Math.floor(cw-7);
+    g.fillStyle=v<.16?'#ffd98a':v<.3?'#cfe8ff':v<.36?'#ff9ad0':'#0c1020';
+    g.fillRect(x,y,w,7);
+    if(v>=.36){g.fillStyle='rgba(80,110,200,.12)';g.fillRect(x,y,w,2)}
+  }
+  for(let j=3;j<rows;j+=4){g.fillStyle='rgba(255,255,255,.07)';g.fillRect(0,8+j*11-2,TW,1)}
+  // placa vertical nas bordas
+  const nv=1+(r()*2|0);
+  for(let k=0;k<nv;k++){
+    const x=r()<.5?3+k*16:TW-17-k*16,hh=46+(r()*5|0)*12,y=10+(r()*30|0),col=NEON[r()*7|0];
+    g.fillStyle='#0a0d1a';g.fillRect(x,y,14,hh);g.strokeStyle=col;g.lineWidth=2;g.strokeRect(x+1,y+1,12,hh-2);
+    for(let s=0;s<hh-14;s+=13){g.fillStyle=NEON[r()*7|0];g.font='bold 11px '+FONT;g.textAlign='center';g.textBaseline='middle';
+      const t=VERT[r()*VERT.length|0];g.fillText(t[0],x+7,y+10+s)}
+  }
+  // loja
+  const col=NEON[r()*7|0],t1=SIGNS[r()*SIGNS.length|0];
+  sign(g,6,top+2,TW-12,20,t1,col,'#120a1c');
+  const warm=r()<.6;
+  const gr=g.createLinearGradient(0,top+24,0,TH);gr.addColorStop(0,warm?'#ffd9a0':'#e6f4ff');gr.addColorStop(1,warm?'#c98a4a':'#8fb4d8');
+  g.fillStyle='#0a0d18';g.fillRect(4,top+24,TW-8,shopH-24);
+  g.fillStyle=gr;g.fillRect(8,top+27,TW-16,shopH-31);
+  for(let s=0;s<3;s++){g.fillStyle='rgba(30,20,50,.55)';g.fillRect(8,top+34+s*12,TW-16,2);
+    for(let i=0;i<9;i++){g.fillStyle=NEON[r()*7|0];g.fillRect(10+i*13,top+29+s*12,6,4)}}
+  g.fillStyle='rgba(10,10,20,.8)';g.fillRect(TW/2-1,top+27,2,shopH-31);
+  // maquinas de venda
+  if(r()<.5){const x=r()<.5?4:TW-34;for(let i=0;i<2;i++){g.fillStyle=['#8fb4e8','#e8a0c0','#7fd0a0'][r()*3|0];g.fillRect(x+i*15,TH-30,13,26);g.fillStyle='#1a2038';g.fillRect(x+i*15+2,TH-27,9,12);g.fillStyle='#ffe28a';g.fillRect(x+i*15+3,TH-26,7,3)}}
+  // piso molhado
+  g.fillStyle='#0b0e1c';g.fillRect(0,TH-3,TW,3);
+  return c;
+}
+function lamp(){
+  const c=mk(32,112),g=c.getContext('2d');
+  const gl=g.createRadialGradient(16,14,0,16,14,15);gl.addColorStop(0,'rgba(255,226,140,.85)');gl.addColorStop(1,'rgba(255,200,90,0)');
+  g.fillStyle=gl;g.fillRect(0,0,32,32);
+  g.fillStyle='#07080f';g.fillRect(15,18,3,92);g.fillRect(13,106,7,6);g.fillRect(10,14,12,5);
+  g.fillStyle='#ffe9a0';g.fillRect(12,13,8,5);g.fillStyle='#fff6d0';g.fillRect(14,14,4,3);
+  return c;
+}
+function fogged(c,level){
+  const o=mk(c.width,c.height),g=o.getContext('2d');g.drawImage(c,0,0);
+  g.globalCompositeOperation='source-atop';g.fillStyle='rgba('+HAZE+','+level+')';g.fillRect(0,0,c.width,c.height);return o;
+}
+const FOG=[0,.25,.5,.72];
+const BTEX=[];
+for(let i=0;i<10;i++){const th=[224,288,352][i%3];const c=building(1000+i*17,128,th);BTEX.push({f:FOG.map(l=>l?fogged(c,l):c),w:128,h:th})}
+const LTEX=(()=>{const c=lamp();return{f:FOG.map(l=>l?fogged(c,l):c),w:32,h:112}})();
+
+// ceu e skyline
+const SKY=(()=>{const c=mk(W,HOR+4),g=c.getContext('2d');
+  const gr=g.createLinearGradient(0,0,0,HOR);gr.addColorStop(0,'#070b1e');gr.addColorStop(.6,'#131b3c');gr.addColorStop(1,'#2a2552');
+  g.fillStyle=gr;g.fillRect(0,0,W,HOR+4);
+  const r=rng(7);for(let i=0;i<260;i++){g.fillStyle='rgba(60,70,120,'+(.05+r()*.12)+')';g.fillRect(r()*W,r()*HOR*.8,6+r()*26,2+r()*3)}
+  return c})();
+const SKYLINE=(()=>{const w=960,h=120,c=mk(w,h),g=c.getContext('2d'),r=rng(21);
+  let x=0;while(x<w){const bw=14+(r()*26|0),bh=30+(r()*80|0);
+    g.fillStyle=r()<.5?'#141a36':'#1a2144';g.fillRect(x,h-bh,bw,bh);
+    for(let y=h-bh+4;y<h-4;y+=5)for(let k=x+2;k<x+bw-2;k+=4)if(r()<.28){g.fillStyle=r()<.7?'#ffd98a':'#9fd8ff';g.fillRect(k,y,2,2)}
+    x+=bw+(r()*4|0)}
+  return c})();
+const RAIN=Array.from({length:110},(_,i)=>({x:Math.random()*W,y:Math.random()*H,v:240+Math.random()*180,l:4+Math.random()*6,a:.25+Math.random()*.35}));
+
+// ---------- carro ----------
+const CAR={};let loaded=0;
+['c','r1','r2','l1','l2'].forEach(k=>{const im=new Image();im.onload=()=>{loaded++};im.src='img/car_'+k+'.png';CAR[k]=im});
+
+// ---------- pista ----------
+const SEG=200,RW=2000,CAMH=1000,DD=130,FOVD=0.84;
+const segs=[];
+function add(curve,y){const i=segs.length;segs.push({i,z:i*SEG,y,curve,spr:[],cw:false})}
+const lastY=()=>segs.length?segs[segs.length-1].y:0;
+const eio=(a,b,t)=>a+(b-a)*(-Math.cos(t*Math.PI)/2+.5);
+function road(en,hold,lv,curve,dy){
+  const sy=lastY(),ey=sy+dy,n=en+hold+lv;
+  for(let i=0;i<en;i++)add(eio(0,curve,i/en),eio(sy,ey,i/n));
+  for(let i=0;i<hold;i++)add(curve,eio(sy,ey,(en+i)/n));
+  for(let i=0;i<lv;i++)add(eio(curve,0,i/lv),eio(sy,ey,(en+hold+i)/n));
+}
+road(0,60,0,0,0);
+road(30,50,30,2.2,0);road(0,40,0,0,0);
+road(30,40,30,-2.8,600);road(20,30,20,0,900);
+road(30,60,30,3.4,-700);road(0,30,0,0,-800);
+road(25,25,25,-2,0);road(25,25,25,2,0);road(25,25,25,-2,500);road(0,40,0,0,0);
+road(40,70,40,-3.6,-300);road(0,60,20,0,0);
+const N=segs.length;
+// cruzamentos, faixas e sprites
+for(let i=0;i<N;i++){
+  const s=segs[i];
+  if(i%110>=100&&i%110<=104)s.cw=true;
+  s.dash=Math.floor(i/4)%2===0;s.yellow=Math.floor(i/300)%2===1;
+  if(i%4===0){
+    s.spr.push({t:BTEX[(i*7+3)%10],off:-2.2});
+    s.spr.push({t:BTEX[(i*5+8)%10],off:2.2});
+  }
+  if(i%8===0){s.spr.push({t:LTEX,off:-1.32,ww:700});}
+  if(i%8===4){s.spr.push({t:LTEX,off:1.32,ww:700});}
+}
+const TRACK=N*SEG;
+
+// ---------- estado ----------
+const MAXSPD=SEG*60*.9,ACC=MAXSPD/5,BRK=-MAXSPD,DEC=-MAXSPD/5,OFFD=-MAXSPD/2,OFFL=MAXSPD/4,CENT=.3;
+let pos=0,px=0,spd=0,steer=0,skyX=0,t=0,rainOn=true,filt=true;
+const key={l:0,r:0,b:0};
+const hud=document.getElementById('hud'),msg=document.getElementById('msg');
+
+function segAt(z){return segs[Math.floor(((z%TRACK)+TRACK)%TRACK/SEG)%N]}
+function update(dt){
+  const sg=segAt(pos),pct=spd/MAXSPD;
+  pos=(pos+dt*spd)%TRACK;
+  const dx=dt*2*pct;
+  const inp=key.r-key.l;
+  steer+=(inp-steer)*Math.min(1,dt*10);
+  px+=dx*steer*1.0;
+  px-=dx*pct*sg.curve*CENT;
+  skyX+=dt*pct*sg.curve*90;
+  const off=Math.abs(px)>1.05;
+  if(key.b)spd+=BRK*dt;else spd+=ACC*dt;
+  if(off&&spd>OFFL)spd+=OFFD*dt;
+  px=clamp(px,-2.2,2.2);spd=clamp(spd,0,MAXSPD);
+  hud.innerHTML=Math.round(spd/MAXSPD*280)+'<small>km/h</small>';
+}
+
+// ---------- desenho ----------
+const rect=(x,y,w,h)=>ctx.fillRect(Math.round(x),y,Math.max(1,Math.round(w)),h);
+function drawRow(y,xc,hw,s,n,tt){
+  const band=Math.floor(s.i/3)%2;
+  // base escura (fachadas) + sidewalk
+  ctx.fillStyle=band?'#12162c':'#10142a';ctx.fillRect(0,y,W,1);
+  const sw=hw*.42;
+  ctx.fillStyle=band?'#4b3a3c':'#54413a';rect(xc-hw-sw,y,sw,1);rect(xc+hw,y,sw,1);
+  ctx.fillStyle='#8a6a2e';rect(xc-hw-sw*.45,y,Math.max(1,sw*.12),1);rect(xc+hw+sw*.33,y,Math.max(1,sw*.12),1);
+  ctx.fillStyle='#8088a8';rect(xc-hw-1,y,2,1);rect(xc+hw-1,y,2,1);
+  // asfalto molhado
+  ctx.fillStyle=band?'#1a2040':'#1d2448';rect(xc-hw,y,hw*2,1);
+  // sheen do asfalto: faixas claras
+  const g0=Math.floor(s.i/5);
+  for(let k=0;k<3;k++){
+    const u=(hash(g0*7+k)*2-1)*.85,c=NEON[Math.floor(hash(g0*13+k)*7)],wu=.05+hash(g0*3+k)*.09;
+    const a=(.16+hash(g0*5+k)*.34)*(.82+.18*Math.sin(tt*3+g0));
+    ctx.globalAlpha=a;ctx.fillStyle=c;rect(xc+u*hw-wu*hw*.5,y,wu*hw,1);
+  }
+  ctx.globalAlpha=1;
+  // linhas
+  ctx.fillStyle='#d7dbef';
+  const lw=Math.max(1,hw*.022);
+  rect(xc-hw*.93,y,lw,1);rect(xc+hw*.93-lw,y,lw,1);
+  if(s.dash){ctx.fillStyle=s.yellow?'#e0b83a':'#d7dbef';rect(xc-lw/2,y,lw,1)}
+  if(s.cw){ctx.fillStyle='#e4e7f6';for(let k=-5;k<=5;k++)rect(xc+(k*.17-.06)*hw,y,hw*.12,1)}
+  // neblina
+  const f=Math.min(.82,Math.pow(n/DD,1.5));
+  if(f>.02){ctx.globalAlpha=f;ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,y,W,1);ctx.globalAlpha=1}
+}
+function render(){
+  const base=segAt(pos),bp=(pos%SEG)/SEG;
+  // ceu
+  ctx.drawImage(SKY,0,0);
+  const sx=((skyX%960)+960)%960;
+  ctx.drawImage(SKYLINE,-sx,HOR-112);ctx.drawImage(SKYLINE,960-sx,HOR-112);
+  const gh=ctx.createLinearGradient(0,HOR-30,0,HOR+2);gh.addColorStop(0,'rgba(120,80,180,0)');gh.addColorStop(1,'rgba(255,150,110,.28)');
+  ctx.fillStyle=gh;ctx.fillRect(0,HOR-30,W,34);
+  ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,HOR,W,H-HOR);
+  const camY=CAMH+eio(base.y,segAt(pos+SEG).y,bp);
+  let x=0,dxc=-base.curve*bp,maxy=H;
+  const P=[];
+  for(let n=0;n<DD;n++){
+    const s=segs[(base.i+n)%N];
+    const wrap=(base.i+n)>=N?TRACK:0;
+    const cx=px*RW,
+      z1=s.z+wrap-pos,z2=z1+SEG;
+    const c1={x:-cx-x,y:s.y-camY,z:z1},c2={x:-cx-x-dxc,y:segs[(s.i+1)%N].y-camY,z:z2};
+    const sc1=FOVD/Math.max(1,z1),sc2=FOVD/Math.max(1,z2);
+    const a={x:Math.round(W/2+sc1*c1.x*W/2),y:Math.round(HOR-sc1*c1.y*H/2),w:sc1*RW*W/2,sc:sc1};
+    const b={x:Math.round(W/2+sc2*c2.x*W/2),y:Math.round(HOR-sc2*c2.y*H/2),w:sc2*RW*W/2,sc:sc2};
+    x+=dxc;dxc+=s.curve;
+    s._a=a;s._b=b;s._clip=maxy;s._n=n;
+    if(z1<=SEG*.3&&n===0){}
+    if(a.y>b.y&&b.y<maxy){
+      const y1=Math.min(a.y,maxy),y2=b.y;
+      for(let y=Math.max(0,y2);y<y1;y++){
+        const tt=(y+.5-b.y)/(a.y-b.y);
+        drawRow(y,b.x+(a.x-b.x)*tt,b.w+(a.w-b.w)*tt,s,n,t);
+      }
+      maxy=b.y;
+    }
+    P.push(s);
+  }
+  // sprites de tras para frente
+  for(let k=P.length-1;k>=0;k--){
+    const s=P[k];if(!s.spr.length||!s._a||s._a.sc<=0)continue;
+    const a=s._a,fog=Math.min(3,Math.floor(Math.pow(s._n/DD,1.4)*4));
+    for(const sp of s.spr){
+      const ww=sp.ww||3000,dw=a.sc*ww*W/2,dh=dw*sp.t.h/sp.t.w;
+      const dX=a.x+a.sc*sp.off*RW*W/2-dw/2,dY=a.y-dh;
+      if(dw<1||dX>W||dX+dw<0)continue;
+      let ch=Math.max(0,dY+dh-s._clip);
+      const sh=sp.t.h-ch*(sp.t.h/dh);
+      if(sh<=0)continue;
+      ctx.drawImage(sp.t.f[fog],0,0,sp.t.w,sh,Math.round(dX),Math.round(dY),Math.ceil(dw),Math.ceil(dh-ch));
+    }
+  }
+  // carro + reflexo
+  const ks=steer>.15?'r1':steer<-.15?'l1':'c';
+  const im=CAR[ks];
+  if(loaded>=5&&im.complete){
+    const bob=spd>0?Math.round(Math.sin(t*38)*(spd/MAXSPD)*.7):0;
+    const cxp=W/2+Math.round(steer*4),cyb=H-34+bob;
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-im.width/2+4,cyb-3,im.width-8,5);
+    ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb);ctx.scale(1,-1);
+    ctx.drawImage(im,Math.round(cxp-im.width/2),cyb-im.height+4);ctx.restore();
+    ctx.drawImage(im,Math.round(cxp-im.width/2),cyb-im.height);
+  }
+  // chuva
+  if(rainOn){
+    ctx.strokeStyle='rgb(170,195,240)';ctx.lineWidth=1;
+    for(const d of RAIN){ctx.globalAlpha=d.a;ctx.beginPath();ctx.moveTo(d.x|0,d.y|0);ctx.lineTo((d.x-d.l*.18)|0,(d.y+d.l)|0);ctx.stroke()}
+    ctx.globalAlpha=1;
+  }
+  if(filt)post();
+}
+// filtro pixel-art: paleta reduzida + dither ordenado
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v/16-.5)*16);
+const LV=10,QT=new Uint8ClampedArray(512);
+function post(){
+  const id=ctx.getImageData(0,0,W,H),d=id.data;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const b=BAY[(y&3)*4+(x&3)],i=(y*W+x)*4;
+    for(let c=0;c<3;c++){const v=d[i+c]+b;d[i+c]=Math.round(clamp(v,0,255)/255*LV)/LV*255}
+  }
+  ctx.putImageData(id,0,0);
+}
+// ---------- loop ----------
+function step(dt){
+  t+=dt;update(dt);
+  for(const d of RAIN){d.y+=d.v*dt;d.x-=d.v*dt*.18;if(d.y>H){d.y=-8;d.x=Math.random()*W*1.2}if(d.x<0)d.x+=W}
+}
+let last=performance.now();
+function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;step(dt);render();requestAnimationFrame(tick)}
+requestAnimationFrame(tick);
+window.__test={step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
+// ---------- controles ----------
+const hold=(id,k)=>{const b=document.getElementById(id);
+  const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};
+  const off=()=>{key[k]=0;b.classList.remove('on')};
+  b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off))};
+hold('bl','l');hold('br','r');hold('bb','b');
+const km={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowDown:'b',s:'b',S:'b'};
+addEventListener('keydown',e=>{if(km[e.key]){key[km[e.key]]=1;msg.style.opacity=0;e.preventDefault()}});
+addEventListener('keyup',e=>{if(km[e.key])key[km[e.key]]=0});
+// toque no palco: metade esquerda/direita
+const st=document.getElementById('stage');
+const side=e=>{const r=st.getBoundingClientRect();return e.clientX<r.left+r.width/2?'l':'r'};
+let tk=null;
+st.addEventListener('pointerdown',e=>{tk=side(e);key[tk]=1;msg.style.opacity=0});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>st.addEventListener(ev,()=>{if(tk){key[tk]=0;tk=null}}));
+const tg=(id,fn)=>{const b=document.getElementById(id);b.onclick=()=>{const v=fn();b.classList.toggle('on',v);b.setAttribute('aria-pressed',v)}};
+tg('tf',()=>filt=!filt);tg('tr',()=>rainOn=!rainOn);
+</script>
