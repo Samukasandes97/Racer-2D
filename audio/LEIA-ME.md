@@ -14,3 +14,7 @@ O jogo (`demos/corrida-shibuya/audio/*.wav`) usa SO cortes do `loud-civic-vtec.m
 
 Mixagem no jogo: sem acelerar = som mais abafado e baixo (freio-motor); troca de marcha = corte rapido do som (embreagem);
 limitador = som pulsando a 8 Hz no corte de 7.700 rpm.
+
+## Camada de alta rotacao (flyby)
+Acima de ~6.400 rpm entra o `honda-vtec-flyby.mp3` (cortes `f_*`): f_acc (motor forte em alta), f_lim (corte de giro, no limite),
+f_shift (marcha trocada, em toda troca), f_blip (reducao), f_pop (tirou o pe em alta: pipocos).
