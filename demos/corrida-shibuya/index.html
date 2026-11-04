@@ -214,7 +214,7 @@ function update(dt){
 
 
 // ---------- motor VTEC sintetizado ----------
-// 4 cilindros, 4 tempos: 2 explosoes por volta -> frequencia de ignicao = rpm/30 Hz. VTEC entra perto de 5700 rpm; corte perto de 8400.
+// 4 cilindros, 4 tempos: 2 explosoes por volta -> frequencia de ignicao = rpm/30 Hz. VTEC entra na faixa de 4800 a 5800 rpm (usamos 5600); corte do B16A em 8400.
 const GEARMAX=[62,110,160,215,285]; // km/h na rotacao maxima de cada marcha
 let gear=0,rpm=900,vt=0,shiftT=0,thr=0,soundOn=true,AC=null,A=null;
 function engine(dt){
@@ -230,7 +230,7 @@ function engine(dt){
   const target=shiftT>0?base*.82:(v<8&&key.a?Math.min(5200,900+(key.a?4300:0)):base);
   rpm+=(target-rpm)*Math.min(1,dt*(thr>.5?12:5));
   rpm=clamp(rpm,850,8450);
-  const want=(rpm>5700&&thr>.4&&shiftT<=0)?1:0;
+  const want=(thr>.4&&shiftT<=0&&(rpm>5600||(vt>.5&&rpm>5200)))?1:0;   // entra ~5600, sai ~5200 (histerese)
   vt+=(want-vt)*Math.min(1,dt*(want?14:6));
   if(AC)audioUpdate();
 }
