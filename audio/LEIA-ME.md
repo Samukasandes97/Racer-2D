@@ -1,13 +1,16 @@
 # Audio do motor VTEC
 
-Origem: `referencias/honda-vtec-flyby.mp3` (enviado por Samuel, intacto). Os clipes usados no jogo
-(`demos/corrida-shibuya/audio/*.wav`) sao CORTES desse arquivo, sem sintese:
+Originais do Samuel (intactos) em `referencias/`:
+- `honda-vtec-flyby.mp3` — carro passando em alta rotacao (corte de giro, troca de marcha, reducao)
+- `loud-civic-vtec.mp3` — arrancada completa de um Civic VTEC, da marcha lenta ao corte de giro (23 s)
+
+O jogo (`demos/corrida-shibuya/audio/*.wav`) usa SO cortes do `loud-civic-vtec.mp3`, sem sintese:
 
 | clipe | trecho original | uso |
 |---|---|---|
-| idle | 0,1–1,15 s | ronco baixo, carro parado/devagar (loop) |
-| acc | 3,4–6,9 s | motor firme em alta, acelerando (loop, tom segue a rotacao) |
-| lim | 7,62–8,72 s | corte de giro (limitador) |
-| dec | 10,7–12,9 s | tirou o pe / freio-motor (loop) |
-| shift | 9,2–9,8 s | embreagem + troca de marcha (queda de giro) |
-| blip | 12,95–13,5 s | reducao de marcha |
+| s0 ... s7 | 8 fatias de rotacao fixa (~1,1 s cada, centros em 4,2 / 5,6 / 7,1 / 8,8 / 10,8 / 13,0 / 16,0 / 19,8 s) | loops; o jogo mistura as 2 vizinhas conforme a rpm e ajusta o tom ate ~15% |
+| idle | 21,4–22,95 s | marcha lenta (loop) |
+| cut | 20,78–21,5 s | tirou o pe em alta rotacao (queda de giro) |
+
+Mixagem no jogo: sem acelerar = som mais abafado e baixo (freio-motor); troca de marcha = corte rapido do som (embreagem);
+limitador = som pulsando a 8 Hz no corte de 7.700 rpm.

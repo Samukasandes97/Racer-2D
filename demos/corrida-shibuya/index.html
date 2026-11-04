@@ -213,27 +213,31 @@ function update(dt){
 }
 
 
-// ---------- motor VTEC: SOMENTE trechos da gravacao original enviada pelo Samuel ----------
-// Cada situacao do carro toca o trecho certo do audio original (sem sintese):
-//  idle = ronco baixo | acc = motor firme em alta | lim = corte de giro | dec = tirou o pe/freio-motor
-//  shift = embreagem + troca (queda de giro) | blip = reducao de marcha
+// ---------- motor VTEC: SOMENTE trechos do audio original enviado pelo Samuel (Civic VTEC, arrancada completa) ----------
+// A gravacao foi cortada em 8 fatias de rotacao fixa (s0 grave ... s7 agudo) + marcha lenta + corte de giro.
+// O jogo mistura as duas fatias vizinhas conforme a rotacao e ajusta o tom so um pouco (maximo ~15%).
 const KMH=180;                                    // velocidade maxima por enquanto
 const GEARMAX=[40,70,102,138,183];                // km/h na rotacao maxima de cada marcha
-let gear=0,rpm=900,shiftT=0,thr=0,soundOn=true,AC=null,A=null;const ev=[];
+const RPMHI=7700,RPM0=2880;                       // corte de giro; rotacao da fatia mais grave
+const FSL=[28.0,31.6,35.4,39.9,44.9,50.5,56.9,64.0]; // tom (Hz) medido em cada fatia
+const HZ_PER_RPM=FSL[0]/RPM0;
+let gear=0,rpm=900,shiftT=0,thr=0,thrPrev=0,soundOn=true,AC=null,A=null;const ev=[];
 const vkmh=()=>spd/MAXSPD*KMH;
 function engine(dt){
   const v=vkmh();
   thr+=((key.a&&!key.b?1:0)-thr)*Math.min(1,dt*8);
   if(shiftT>0)shiftT-=dt;
   else{
-    const r=v/GEARMAX[gear]*8400;
-    if(r>7800&&gear<4){gear++;shiftT=.6;ev.push('shift')}
-    else if(gear>0&&r<3200){gear--;shiftT=.35;ev.push('blip')}
+    const r=v/GEARMAX[gear]*RPMHI;
+    if(r>7300&&gear<4){gear++;shiftT=.45}
+    else if(gear>0&&r<3000){gear--;shiftT=.3}
   }
-  const base=Math.max(900,v/GEARMAX[gear]*8400);
-  const target=(v<8&&key.a)?3500:base;
+  const base=Math.max(900,v/GEARMAX[gear]*RPMHI);
+  const target=(v<8&&key.a)?3400:base;
   rpm+=(target-rpm)*Math.min(1,dt*(shiftT>0?7:(thr>.5?12:5)));
-  rpm=clamp(rpm,850,8450);
+  rpm=clamp(rpm,850,RPMHI+60);
+  if(thrPrev>.7&&thr<.5&&rpm>5000)ev.push('cut');   // tirou o pe em rotacao alta
+  thrPrev=thr;
   if(A&&A.ready)audioUpdate();
 }
 function initAudio(){
@@ -241,11 +245,13 @@ function initAudio(){
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   try{AC=new C()}catch(e){return}
   A={ready:false,L:{},B:{}};
-  const names=['idle','acc','lim','dec','shift','blip'];
+  const names=['idle','s0','s1','s2','s3','s4','s5','s6','s7','cut'];
   Promise.all(names.map(n=>fetch('audio/'+n+'.wav').then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{A.B[n]=buf}))).then(()=>{
-    for(const n of ['idle','acc','lim','dec']){
+    A.lp=AC.createBiquadFilter();A.lp.type='lowpass';A.lp.frequency.value=16000;A.lp.connect(AC.destination);
+    A.mst=AC.createGain();A.mst.gain.value=1;A.mst.connect(A.lp);
+    for(const n of names.slice(0,9)){
       const src=AC.createBufferSource();src.buffer=A.B[n];src.loop=true;
-      const g=AC.createGain();g.gain.value=0;src.connect(g);g.connect(AC.destination);src.start();A.L[n]={src,g};
+      const g=AC.createGain();g.gain.value=0;src.connect(g);g.connect(A.mst);src.start();A.L[n]={src,g};
     }
     A.ready=true;
   }).catch(()=>{});
@@ -255,18 +261,28 @@ function oneShot(n,vol){
   src.connect(g);g.connect(AC.destination);src.start();
 }
 function audioUpdate(){
-  const T=AC.currentTime,n=clamp(rpm/8400,0,1),v=vkmh(),on=soundOn?1:0;
-  while(ev.length){const e=ev.shift();if(on)oneShot(e,e==='shift'?1.1:1.2)}
-  const t={idle:0,acc:0,lim:0,dec:0};
-  if(shiftT>0){}
-  else if(thr>.3){if(rpm>8200)t.lim=1;else t.acc=1}
-  else if(v>4)t.dec=1;
-  else t.idle=1;
-  const lv={idle:3.2,acc:1,lim:1,dec:1.3};
-  for(const k in t)A.L[k].g.gain.setTargetAtTime(t[k]*lv[k]*on,T,.03);
-  const ra=.5+.55*n;                               // acompanha a rotacao; perto de 1,0 = tom original
-  A.L.acc.src.playbackRate.setTargetAtTime(ra,T,.05);
-  A.L.dec.src.playbackRate.setTargetAtTime(Math.min(1.25,ra/.78),T,.05);
+  const T=AC.currentTime,on=soundOn?1:0;
+  while(ev.length){const e=ev.shift();if(on)oneShot(e,.9)}
+  const P=rpm*HZ_PER_RPM;                               // tom desejado (Hz)
+  const w={};for(const k in A.L)w[k]=0;const rt={};
+  let i=0;while(i<7&&P>=FSL[i+1])i++;
+  if(P>=FSL[7]){w.s7=1;rt.s7=P/FSL[7]}
+  else if(P<=FSL[0]){w.s0=1;rt.s0=Math.max(.8,P/FSL[0])}
+  else{const x=Math.log(P/FSL[i])/Math.log(FSL[i+1]/FSL[i]);
+    w['s'+i]=Math.cos(x*Math.PI/2);w['s'+(i+1)]=Math.sin(x*Math.PI/2);rt['s'+i]=P/FSL[i];rt['s'+(i+1)]=P/FSL[i+1]}
+  // abaixo da rotacao da fatia mais grave, entra a marcha lenta
+  const wi=clamp((RPM0-rpm)/1500,0,1),sm=wi*wi*(3-2*wi);
+  for(const k in w)if(k[0]==='s')w[k]*=Math.sqrt(1-sm);
+  w.idle=Math.sqrt(sm);
+  let m=on*(.45+.55*thr);                               // pe no acelerador = som cheio; sem acelerar = freio-motor
+  if(shiftT>0&&gear>0)m*=.15;                           // embreagem: corte rapido do som na troca
+  if(rpm>RPMHI-130&&thr>.3)m*=(Math.sin(T*2*Math.PI*8)>0)?1:.3; // limitador de giro
+  for(const k in A.L){
+    const idle=k==='idle';
+    A.L[k].g.gain.setTargetAtTime(w[k]*(idle?on*(thr>.3?.6:1):m),T,.03);
+    if(rt[k])A.L[k].src.playbackRate.setTargetAtTime(rt[k],T,.05);
+  }
+  A.lp.frequency.setTargetAtTime(2200+thr*13800,T,.08);
 }
 ['pointerdown','keydown'].forEach(ev2=>addEventListener(ev2,initAudio));
 
