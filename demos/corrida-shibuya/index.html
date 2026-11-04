@@ -209,16 +209,17 @@ function update(dt){
   if(key.b)spd+=BRK*dt;else if(key.a)spd+=ACC*dt;else spd+=DEC*dt;
   if(off&&spd>OFFL)spd+=OFFD*dt;
   px=clamp(px,-2.2,2.2);spd=clamp(spd,0,MAXSPD);
-  engine(dt);hud.innerHTML=Math.round(spd/MAXSPD*280)+'<small>km/h</small><br>'+Math.round(rpm/10)*10+'<small>rpm · '+(gear+1)+'ª'+(vt>.5?' · VTEC':'')+'</small>';
+  engine(dt);hud.innerHTML=Math.round(spd/MAXSPD*KMH)+'<small>km/h</small><br>'+Math.round(rpm/10)*10+'<small>rpm · '+(gear+1)+'ª</small>';
 }
 
 
-// ---------- motor VTEC sintetizado ----------
-// 4 cilindros, 4 tempos: 2 explosoes por volta -> frequencia de ignicao = rpm/30 Hz. VTEC entra na faixa de 4800 a 5800 rpm (usamos 5600); corte do B16A em 8400.
-const GEARMAX=[62,110,160,215,285]; // km/h na rotacao maxima de cada marcha
+// ---------- motor VTEC: SOMENTE a gravacao enviada pelo Samuel ----------
+// O loop (trecho estavel, tom base 188 Hz) toca sempre; a velocidade de reproducao segue a rotacao do carro.
+const KMH=180;                                    // velocidade maxima do jogo por enquanto
+const GEARMAX=[40,70,102,138,183];                // km/h na rotacao maxima de cada marcha
 let gear=0,rpm=900,vt=0,shiftT=0,thr=0,soundOn=true,AC=null,A=null;
 function engine(dt){
-  const v=spd/MAXSPD*280;
+  const v=spd/MAXSPD*KMH;
   thr+=((key.a&&!key.b?1:0)-thr)*Math.min(1,dt*8);
   if(shiftT>0)shiftT-=dt;
   else{
@@ -227,57 +228,27 @@ function engine(dt){
     else if(gear>0&&r<3200){gear--;shiftT=.15}
   }
   const base=Math.max(900,v/GEARMAX[gear]*8400);
-  const target=shiftT>0?base*.82:(v<8&&key.a?Math.min(5200,900+(key.a?4300:0)):base);
+  const target=shiftT>0?base*.82:(v<8&&key.a?3500:base);
   rpm+=(target-rpm)*Math.min(1,dt*(thr>.5?12:5));
   rpm=clamp(rpm,850,8450);
-  const want=(thr>.4&&shiftT<=0&&(rpm>5600||(vt>.5&&rpm>5200)))?1:0;   // entra ~5600, sai ~5200 (histerese)
-  vt+=(want-vt)*Math.min(1,dt*(want?14:6));
-  if(AC)audioUpdate();
+  vt+=(((thr>.4&&shiftT<=0&&(rpm>5600||(vt>.5&&rpm>5200)))?1:0)-vt)*Math.min(1,dt*10);
+  if(A&&A.smp)audioUpdate();
 }
 function initAudio(){
   if(AC){if(AC.state==='suspended')AC.resume();return}
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   try{AC=new C()}catch(e){return}
-  const out=AC.createGain();out.gain.value=0;out.connect(AC.destination);
-  const sh=AC.createWaveShaper(),cu=new Float32Array(1024);
-  for(let i=0;i<1024;i++){const x=i/512-1;cu[i]=Math.tanh(x*2.4)}
-  sh.curve=cu;
-  const lp=AC.createBiquadFilter();lp.type='lowpass';lp.Q.value=.9;
-  sh.connect(lp);lp.connect(out);
-  const mix=(type,det)=>{const o=AC.createOscillator();o.type=type;o.detune.value=det;const g=AC.createGain();g.gain.value=0;o.connect(g);g.connect(sh);o.start();return{o,g}};
-  const lo1=mix('sawtooth',0),lo2=mix('triangle',0),lo3=mix('sawtooth',9);
-  const hi1=mix('sawtooth',0),hi2=mix('square',0),hi3=mix('sawtooth',-11);
-  const nb=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate),nd=nb.getChannelData(0);
-  for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
-  const ns=AC.createBufferSource();ns.buffer=nb;ns.loop=true;
-  const bp=AC.createBiquadFilter();bp.type='bandpass';bp.Q.value=.9;const ng=AC.createGain();ng.gain.value=0;
-  ns.connect(bp);bp.connect(ng);ng.connect(out);ns.start();
-  A={out,lp,lo1,lo2,lo3,hi1,hi2,hi3,bp,ng,pv:0,smp:null};
-  // camada real do VTEC (trecho estavel da gravacao enviada, tom base 188 Hz)
+  A={smp:null};
   fetch('audio/vtec_loop.wav').then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{
     const src=AC.createBufferSource();src.buffer=buf;src.loop=true;
-    const g=AC.createGain();g.gain.value=0;const hp=AC.createBiquadFilter();hp.type='highpass';hp.frequency.value=90;
-    src.connect(hp);hp.connect(g);g.connect(out);src.start();A.smp={src,g};
+    const g=AC.createGain();g.gain.value=0;src.connect(g);g.connect(AC.destination);src.start();A.smp={src,g};
   }).catch(()=>{});
 }
 function audioUpdate(){
-  const T=AC.currentTime,f=rpm/30,k=.04;
-  const set=(p,v)=>p.setTargetAtTime(v,T,k);
-  const r=rpm/8400;
-  set(A.lo1.o.frequency,f);set(A.lo2.o.frequency,f*2);set(A.lo3.o.frequency,f);
-  set(A.hi1.o.frequency,f*1.5);set(A.hi2.o.frequency,f*3);set(A.hi3.o.frequency,f*1.5);
-  const lowG=(1-vt)*(.16+.2*thr),hiG=vt*(.2+.1*r)*(A.smp?.2:1);
-  set(A.lo1.g.gain,lowG);set(A.lo2.g.gain,lowG*.9);set(A.lo3.g.gain,lowG*.7);
-  set(A.hi1.g.gain,hiG);set(A.hi2.g.gain,hiG*.55);set(A.hi3.g.gain,hiG*.7);
-  if(A.smp){set(A.smp.src.playbackRate,Math.max(.5,f/188));set(A.smp.g.gain,vt*(.55+.35*thr)*1.1)}
-  set(A.lp.frequency,500+rpm*.7+thr*1400+vt*3200);
-  set(A.bp.frequency,700+rpm*.45+vt*1500);
-  set(A.ng.gain,.01+.1*thr*r+.14*vt*r);
-  let vol=soundOn?(shiftT>0?.25:1)*(.55+.45*thr):0;
-  if(rpm>8300&&thr>.4)vol*=Math.sin(t*95)>0?1:.3;   // limitador de rotacao
-  if(vt>.5&&A.pv<=.5)vol*=1.35;                     // empurrao na entrada do VTEC
-  A.pv=vt;
-  set(A.out.gain,vol*.5);
+  const T=AC.currentTime,n=(rpm-900)/(8400-900);
+  A.smp.src.playbackRate.setTargetAtTime(.5+clamp(n,0,1),T,.05);   // 0,5x (marcha lenta) ate 1,5x (corte)
+  const vol=soundOn?(shiftT>0?.35:1)*(.3+.7*thr)*(.55+.45*clamp(n*1.5,0,1)):0;
+  A.smp.g.gain.setTargetAtTime(vol*.9,T,.05);
 }
 ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,initAudio));
 
