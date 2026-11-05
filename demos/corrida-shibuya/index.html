@@ -163,22 +163,22 @@ fetch('img/rig/rig.json').then(r=>r.json()).then(meta=>{
       if(r.face){w.face=new Image();load(w.face,'img/rig/'+k+'_face_'+r.nome+'.png')}}}
   Promise.all(jobs).then(()=>{rigReady=true});
 }).catch(()=>{});
-const CARCV=document.createElement('canvas');CARCV.width=190;CARCV.height=100;const cg=CARCV.getContext('2d');
+const CARCV=document.createElement('canvas');CARCV.width=230;const CVW=230;CARCV.height=100;const cg=CARCV.getContext('2d');
 const wheelScr={};
-const CORNER={c:{rl:2,rr:3},l2:{r:3,f:1},r2:{r:2,f:0}};
+const CORNER={c:{rl:2,rr:3},l2:{r:3,f:1},r2:{r:2,f:0},l3:{r:3,f:1},r3:{r:2,f:0}};
 function drawRig(k){
-  const R=RIG[k],m=R.m,B=BODY,ox=Math.round((190-m.w)/2),oy=100-m.h-10;
-  cg.clearRect(0,0,190,100);cg.imageSmoothingEnabled=false;
-  const roll=k==='c',front=k==='l2'?1:-1;
+  const R=RIG[k],m=R.m,B=BODY,ox=Math.round((CVW-m.w)/2),oy=100-m.h-10;
+  cg.clearRect(0,0,CVW,100);cg.imageSmoothingEnabled=false;
+  const roll=k==='c',right=k==='l2'||k==='l3',front=right?1:-1;
   const ang0=roll?-Math.atan2(2*B.r,m.w*.8):-front*Math.atan2(2*B.p,90),ang=clamp(ang0,-.035,.035);
-  const up=roll?B.h-B.p:B.h+(k==='l2'?B.r:-B.r)*.4-B.p*.3;
+  const up=roll?B.h-B.p:B.h+(right?B.r:-B.r)*.4-B.p*.3;
   const bodyT=()=>{cg.translate(ox+m.w/2,oy+m.h);cg.rotate(ang);cg.translate(0,-up);cg.translate(-m.w/2,-m.h)};
   cg.save();bodyT();cg.drawImage(R.well,0,0);cg.restore();
   for(const nm in R.wh){
     const w=R.wh[nm],ph=WH[CORNER[k][nm]],r=w.r,zy=Math.round(ph.z);
-    cg.drawImage(w.img,ox+r.x,oy+r.y-zy);
+    if(k==='c'){treadWheel(w.img,ph,ox+r.x,oy+r.y-zy)}else cg.drawImage(w.img,ox+r.x,oy+r.y-zy);
     if(w.face){
-      const f=r.face,dir=k==='l2'?1:-1,sp=ph.spin*dir,step=Math.abs(dtLast*(spd/MAXSPD*KMH/3.6)/WR);
+      const f=r.face,dir=right?1:-1,sp=ph.spin*dir,step=Math.abs(dtLast*(spd/MAXSPD*KMH/3.6)/WR);
       cg.save();cg.imageSmoothingEnabled=true;cg.translate(ox+f.cx,oy+f.cy-zy);cg.rotate(f.tilt*Math.PI/180);cg.scale(f.a/f.b,1);
       if(step>.3){const N=5;for(let j=0;j<N;j++){cg.save();cg.rotate(sp+dir*j*(2*Math.PI/7)/N);cg.globalAlpha=.3;cg.drawImage(w.face,-f.S/2,-f.S/2);cg.restore()}}
       else{cg.rotate(sp);cg.drawImage(w.face,-f.S/2,-f.S/2)}
@@ -190,11 +190,33 @@ function drawRig(k){
   return {ox,oy,w:m.w,h:m.h};
 }
 let dtLast=1/60;
-const SPR=[];
+// pneu visto de tras: a banda de rodagem "rola" para baixo (listras que acompanham o giro; em alta vira borrao)
+const TMPC=document.createElement('canvas');TMPC.width=40;TMPC.height=40;const tg2=TMPC.getContext('2d');
+function treadWheel(img,ph,x,y){
+  tg2.clearRect(0,0,40,40);tg2.globalCompositeOperation='source-over';tg2.drawImage(img,0,0);
+  tg2.globalCompositeOperation='source-atop';
+  const step=Math.abs(dtLast*(spd/MAXSPD*KMH/3.6)/WR),P=5,moving=spd>20;
+  if(moving){
+    const ph0=step>.3?Math.random()*P:(ph.spin*1.6)%P,blur=step>.3;
+    for(let yy=-P+ph0;yy<img.height;yy+=P){
+      tg2.fillStyle=blur?'rgba(140,150,175,.22)':'rgba(0,0,0,.34)';tg2.fillRect(0,yy,40,blur?P:2);
+      if(!blur){tg2.fillStyle='rgba(190,200,230,.16)';tg2.fillRect(0,yy+3,40,1)}
+    }
+  }
+  tg2.globalCompositeOperation='source-over';cg.drawImage(TMPC,0,0,img.width,img.height,x,y,img.width,img.height);
+}
+const SPR=[],SMK=[];
 function spray(dx0,dy0,ks){
   const pc=spd/MAXSPD;
   if(pc>.08)for(const kk of(ks==='c'?['crl','crr']:[ks+'r'])){const p=wheelScr[kk];if(!p)continue;
     for(let i=0,n=Math.round(pc*3+Math.random());i<n;i++)SPR.push({x:dx0+p.x+(Math.random()-.5)*8,y:dy0+p.y-3,vx:(Math.random()-.5)*34,vy:-(18+Math.random()*50)*pc,l:.45+Math.random()*.25})}
+  const sl=Math.abs(slip);
+  if(sl>.2)for(const kk of(ks==='c'?['crl','crr']:[ks+'r'])){const p=wheelScr[kk];if(!p)continue;
+    for(let i=0,n=Math.round(sl*4+Math.random()*2);i<n;i++)SMK.push({x:dx0+p.x+(Math.random()-.5)*10,y:dy0+p.y-2,vx:(Math.random()-.5)*18-slip*30,vy:-(6+Math.random()*16),l:.7+Math.random()*.5,s:2+Math.random()*3,g:6+Math.random()*10})}
+  for(let i=SMK.length-1;i>=0;i--){const q=SMK[i];q.l-=dtLast;if(q.l<=0||SMK.length>260){SMK.splice(i,1);continue}
+    q.x+=q.vx*dtLast;q.y+=q.vy*dtLast;q.s+=q.g*dtLast;
+    ctx.globalAlpha=Math.min(1,q.l*1.4)*.42;ctx.fillStyle='#dfe3ee';ctx.fillRect(Math.round(q.x-q.s/2),Math.round(q.y-q.s/2),Math.round(q.s),Math.round(q.s*.8))}
+  ctx.globalAlpha=1;
   for(let i=SPR.length-1;i>=0;i--){const q=SPR[i];q.l-=dtLast;if(q.l<=0||SPR.length>400){SPR.splice(i,1);continue}
     q.vy+=160*dtLast;q.x+=q.vx*dtLast;q.y+=q.vy*dtLast;
     ctx.globalAlpha=Math.min(1,q.l*2.2)*.55;ctx.fillStyle='#c5d6ff';ctx.fillRect(Math.round(q.x),Math.round(q.y),1,q.vy<0?2:1)}
@@ -251,7 +273,12 @@ function update(dt){
   const dx=dt*2*pct;
   const inp=key.r-key.l;
   steer+=(inp-steer)*Math.min(1,dt*7);
-  px+=dx*steer*1.25;
+  // derrapagem: segurou a curva por muito tempo em velocidade -> o carro escorrega de lado (drift); soltar ou contra-esterçar recupera
+  if(inp!==0){if(Math.sign(inp)===holdDir)holdT+=dt;else{holdDir=Math.sign(inp);holdT=0}}else holdT=Math.max(0,holdT-dt*3);
+  const dTarget=(holdT>.8&&pct>.5)?holdDir*clamp((holdT-.8)/.7,0,1):0;
+  slip+=(dTarget-slip)*Math.min(1,dt*(Math.abs(dTarget)>Math.abs(slip)?3:5));
+  if(Math.abs(slip)>.15){spd-=MAXSPD*.09*Math.abs(slip)*dt;px+=dx*slip*.45}
+  px+=dx*steer*1.25*(1+.3*Math.abs(slip));
   px-=dx*pct*sg.curve*CENT;
   skyX+=dt*pct*sg.curve*90;
   const off=Math.abs(px)>1.05;
@@ -349,12 +376,12 @@ const BODY={h:0,hv:0,p:0,pv:0,r:0,rv:0};
 //                  a: +1 frente   b: +1 direita
 const WH=[{n:'fl',a:1,b:-1},{n:'fr',a:1,b:1},{n:'rl',a:-1,b:-1},{n:'rr',a:-1,b:1}].map(w=>({...w,z:0,zp:0,spin:0,imp:0,impT:9}));
 const WR=.30;                                     // raio da roda em metros (para o giro)
-let spdPrev=0,rough=0;
+let spdPrev=0,rough=0,slip=0,holdT=0,holdDir=0,lvl=0;
 const yAt=z=>{const s0=segAt(z),s1=segAt(z+SEG),f=((z%SEG)+SEG)%SEG/SEG;return s0.y+(s1.y-s0.y)*f};
 function curbStep(px,side){const e=side*px-.95;return e<=0?0:Math.min(1,e/.12)*2.4}  // meio-fio ~2,4 px
 function physics(dt,sg,pct){
   const ax=(spd-spdPrev)/Math.max(dt,1e-3)/MAXSPD;spdPrev=spd;
-  const ay=clamp(steer*pct*.9+sg.curve*pct*pct*.25,-1.2,1.2);
+  const ay=clamp(steer*pct*.9+slip*pct*.9+sg.curve*pct*pct*.25,-1.4,1.4);
   const curv=(yAt(pos+SEG)-2*yAt(pos)+yAt(pos-SEG))/(SEG*SEG);
   const hillF=clamp(-curv*spd*spd*SUSP.Kh,-190,190);
   // lombadas/buracos pontuais da pista (tampas de bueiro e faixas pintadas), roda a roda
@@ -465,10 +492,12 @@ function render(){
     }
   }
   // carro (corpo + rodas separadas pela fisica) + reflexo
-  const ks=steer>.3?'l2':steer<-.3?'r2':'c';
+  const m=Math.max(Math.abs(steer)*.55,Math.abs(slip)),sd=Math.abs(slip)>.05?Math.sign(slip):Math.sign(steer);
+  let nl=Math.abs(slip)>(lvl===3?.45:.6)?3:(m>(lvl>=2?.2:.3)?2:0);lvl=nl;
+  const ks=lvl===3?(sd>0?'l3':'r3'):lvl===2?(sd>0?'l2':'r2'):'c';
   if(rigReady&&RIG[ks]){
-    const g=drawRig(ks),cxp=W/2+Math.round(steer*4),cyb=H-34;
-    const dx0=Math.round(cxp-95),dy0=cyb-(100-10);
+    const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-34;
+    const dx0=Math.round(cxp-CVW/2),dy0=cyb-(100-10);
     ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-g.w/2+6,cyb-3,g.w-12,5);
     ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb+2);ctx.scale(1,-1);ctx.drawImage(CARCV,dx0,dy0);ctx.restore();
     ctx.drawImage(CARCV,dx0,dy0);
@@ -504,7 +533,7 @@ function step(dt){
 let last=performance.now();
 function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;step(dt);render();requestAnimationFrame(tick)}
 requestAnimationFrame(tick);
-window.__test={BODY,WH,step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
+window.__test={BODY,WH,get slip(){return slip},get lvl(){return lvl},step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
 // ---------- controles ----------
 const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};

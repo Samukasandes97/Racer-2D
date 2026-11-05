@@ -11,3 +11,8 @@
 - Rodas recortadas da arte oficial (traseira, traseira 3/4 direita e esquerda) por `ferramentas/arte2d/separar_rodas.py`: corpo com buraco + "poco" escuro + pneu/roda de cada roda + disco da roda desentortado (gira em tempo real). Pecas em alta resolucao em `arte/carro-honda-laranja/rig-hires/`, na escala do jogo em `demos/corrida-shibuya/img/rig/`.
 - Fisica (secao FISICA DO CARRO no index.html, sem depender de canvas, portavel para Godot/Unity): modelo de 3 graus de liberdade (altura, arfagem, rolagem), mola+amortecedor por roda, transferencia de carga (freada/aceleracao/curva), meio-fio, calcada, lombadas, giro da roda = v/raio (com borrao em alta), respingos de agua nas rodas de tras.
 - Velocidade maxima 180 km/h = corte de giro (7.700 rpm): limitador + pipocos aleatorios.
+
+## Drift e efeito de giro (2026-11-05)
+- Derrapagem: segurar a direcao por ~0,8 s acima de ~50% da velocidade faz o carro escorregar (slip); mostra a vista LATERAL (arte oficial 90/270 com rodas recortadas), fumaca nas rodas de tras, perde velocidade e desliza de lado. Soltar ou contra-esterçar recupera.
+- Vista de tras: a banda de rodagem do pneu "rola" para baixo seguindo o giro (borrao em alta velocidade).
+- Camera de primeira pessoa: aguardando a foto do interior enviada pelo Samuel.
