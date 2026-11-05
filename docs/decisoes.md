@@ -22,3 +22,12 @@
 - Faróis iluminando a pista, lanternas e luz de freio, setas (automaticas ao esterçar + pisca-alerta), rastro de luz vermelho das lanternas, brilho aditivo.
 - Escapamento: fumaca, labareda nos pipocos, carro treme com o motor ligado.
 - Fisica: inercia lateral (peso), aerodinamica abaixa o carro com a velocidade, torque do motor rola a carroceria, mais afundar na freada.
+
+## Cockpit (primeira pessoa)
+- Camadas derivadas da foto interior_01.jpg (original intacto) por `ferramentas/arte2d/preparar_cockpit.py`: fundo com buracos (para-brisa, janelas, retrovisores), volante sem mãos, luvas e antebraços separados.
+- Para-brisa funcional: pista ao vivo pelo vidro, gotas de chuva, limpador (botão FAN / tecla Q), desembaçador, névoa interna.
+- Volante com giro total de 190° (±95°), mola/amortecedor, contra-esterço no drift, treme em buracos. Direção mais lenta na cabine.
+- Balanço da cabine (curva, aceleração, buracos); antebraços esticam até as luvas; mão direita solta o volante no freio de mão.
+- Painel: ponteiro de velocidade (mostrador só vai até 140) e de rotação (x100), setas verdes, luz vermelha do freio de mão, rádio FM (sem áudio até ele enviar músicas), HEAT/FAN/HEAT = desembaçar/limpador/farol.
+- Nitro: botão ou tecla N/Shift; tanque gasta e recarrega; passa de 180 km/h só enquanto ativo.
+- Retrovisores: reflexo espelhado da cena (não é a visão real de trás).
