@@ -16,3 +16,9 @@
 - Derrapagem: segurar a direcao por ~0,8 s acima de ~50% da velocidade faz o carro escorregar (slip); mostra a vista LATERAL (arte oficial 90/270 com rodas recortadas), fumaca nas rodas de tras, perde velocidade e desliza de lado. Soltar ou contra-esterçar recupera.
 - Vista de tras: a banda de rodagem do pneu "rola" para baixo seguindo o giro (borrao em alta velocidade).
 - Camera de primeira pessoa: aguardando a foto do interior enviada pelo Samuel.
+
+## Luzes, escapamento e mais fisica (2026-11-05)
+- Botao/tecla de drift (freio de mao, Espaco) alem da regra automatica (mantida).
+- Faróis iluminando a pista, lanternas e luz de freio, setas (automaticas ao esterçar + pisca-alerta), rastro de luz vermelho das lanternas, brilho aditivo.
+- Escapamento: fumaca, labareda nos pipocos, carro treme com o motor ligado.
+- Fisica: inercia lateral (peso), aerodinamica abaixa o carro com a velocidade, torque do motor rola a carroceria, mais afundar na freada.

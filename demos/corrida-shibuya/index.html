@@ -52,11 +52,14 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
     <button id="br" aria-label="Virar para a direita">Direita ▶</button>
     <button id="ba" aria-label="Acelerar">Acelerar</button>
     <button id="bb" aria-label="Frear">Frear</button>
+    <button id="bd" class="wide" aria-label="Drift (freio de mão)">Drift · freio de mão</button>
   </div>
   <div class="row">
     <button id="tf" class="on" aria-pressed="true">Filtro pixel-art</button>
     <button id="tr" class="on" aria-pressed="true">Chuva</button>
     <button id="ts" class="on" aria-pressed="true">Som do motor</button>
+    <button id="tl" class="on" aria-pressed="true">Faróis</button>
+    <button id="th" aria-pressed="false">Pisca-alerta</button>
   </div>
   <p class="note"><b>Como funciona:</b> a câmera fica fixa atrás do carro, como no Top Gear. A pista é desenhada em faixas que se entortam nas curvas e sobem e descem nas ladeiras. Os prédios, postes e placas são sprites que crescem ao chegar perto. O carro é a sua arte (traseira e 3/4); a cena foi desenhada por mim em código para seguir as suas referências de Shibuya.</p>
 </div>
@@ -171,7 +174,8 @@ function drawRig(k){
   cg.clearRect(0,0,CVW,100);cg.imageSmoothingEnabled=false;
   const roll=k==='c',right=k==='l2'||k==='l3',front=right?1:-1;
   const ang0=roll?-Math.atan2(2*B.r,m.w*.8):-front*Math.atan2(2*B.p,90),ang=clamp(ang0,-.035,.035);
-  const up=roll?B.h-B.p:B.h+(right?B.r:-B.r)*.4-B.p*.3;
+  const pc=spd/MAXSPD,vib=Math.sin(t*2*Math.PI*(13+rpm/900))*.62*(1-.55*pc)+(Math.random()-.5)*.35;   // motor ligado: carro treme
+  const up=(roll?B.h-B.p:B.h+(right?B.r:-B.r)*.4-B.p*.3)+vib;
   const bodyT=()=>{cg.translate(ox+m.w/2,oy+m.h);cg.rotate(ang);cg.translate(0,-up);cg.translate(-m.w/2,-m.h)};
   cg.save();bodyT();cg.drawImage(R.well,0,0);cg.restore();
   for(const nm in R.wh){
@@ -187,7 +191,7 @@ function drawRig(k){
     wheelScr[k+nm]={x:ox+r.x+r.w/2,y:oy+r.y+r.h-zy};
   }
   cg.save();bodyT();cg.drawImage(R.body,0,0);cg.restore();
-  return {ox,oy,w:m.w,h:m.h};
+  return {ox,oy,w:m.w,h:m.h,up};
 }
 let dtLast=1/60;
 // pneu visto de tras: a banda de rodagem "rola" para baixo (listras que acompanham o giro; em alta vira borrao)
@@ -263,7 +267,7 @@ const MAXSPD=SEG*60*.6,BRK=-MAXSPD/2.5,DEC=-MAXSPD/8,OFFD=-MAXSPD/2,OFFL=MAXSPD/
 // aceleracao em degrade: forte no comeco, suave perto do maximo (0 a 180 km/h em ~30 s)
 const accel=p=>MAXSPD*(.075*(1-p)+.0094);
 let pos=0,px=0,spd=0,steer=0,skyX=0,t=0,rainOn=true,filt=true;
-const key={l:0,r:0,b:0,a:0};
+const key={l:0,r:0,b:0,a:0,d:0};
 const hud=document.getElementById('hud'),msg=document.getElementById('msg');
 
 function segAt(z){return segs[Math.floor(((z%TRACK)+TRACK)%TRACK/SEG)%N]}
@@ -277,9 +281,13 @@ function update(dt){
   if(inp!==0){if(Math.sign(inp)===holdDir)holdT+=dt;else{holdDir=Math.sign(inp);holdT=0}}else holdT=Math.max(0,holdT-dt*3);
   const dTarget=(holdT>.8&&pct>.5)?holdDir*clamp((holdT-.8)/.7,0,1):0;
   slip+=(dTarget-slip)*Math.min(1,dt*(Math.abs(dTarget)>Math.abs(slip)?3:5));
-  if(Math.abs(slip)>.15){spd-=MAXSPD*.09*Math.abs(slip)*dt;px+=dx*slip*.45}
-  px+=dx*steer*1.25*(1+.3*Math.abs(slip));
-  px-=dx*pct*sg.curve*CENT;
+  // botao de drift (freio de mao): puxa o carro de lado na direcao em que esta guiando (ou da curva)
+  if(key.d&&pct>.25){const dd=inp?Math.sign(inp):(Math.abs(slip)>.05?Math.sign(slip):(sg.curve?Math.sign(sg.curve):1));holdDir=dd;holdT=Math.max(holdT,1.6);slip+=(dd-slip)*Math.min(1,dt*7);spd-=MAXSPD*.15*dt}
+  const sa=Math.abs(slip);
+  if(sa>.15)spd-=MAXSPD*.09*sa*dt;
+  const ux=2*pct*(steer*1.25*(1+.3*sa)+slip*.45-pct*sg.curve*CENT);   // velocidade lateral desejada
+  vxl+=(ux-vxl)*Math.min(1,dt*(sa>.15?3:5.5));px+=vxl*dt;            // inercia lateral: o peso do carro demora a responder
+  if(Math.abs(steer)>.55){sigDir=Math.sign(steer);sigT=2.2}else sigT=Math.max(0,sigT-dt);
   skyX+=dt*pct*sg.curve*90;
   const off=Math.abs(px)>1.05;
   if(key.b)spd+=BRK*dt;else if(key.a)spd+=accel(spd/MAXSPD)*dt;else spd+=DEC*dt;
@@ -333,6 +341,7 @@ function initAudio(){
   }).catch(()=>{});
 }
 function oneShot(n,vol){
+  if(n==='f_pop'||n==='f_blip')popFlash=.1;
   const src=AC.createBufferSource();src.buffer=A.B[n];const g=AC.createGain();g.gain.value=vol;
   src.connect(g);g.connect(AC.destination);src.start();
 }
@@ -371,12 +380,12 @@ function audioUpdate(){
 // Modelo de 3 graus de liberdade com 4 rodas: altura (h), arfagem (p) e rolagem (r) do corpo, cada roda com sua
 // propria entrada de pista (lombadas, meio-fio, calcada, buracos) e giro proprio (spin). Unidades: px do sprite, y para cima.
 // Esta parte nao depende de canvas/HTML: pode ser portada para Godot/Unity.
-const SUSP={ks:70,cs:9,Kx:340,Ky:150,Kh:.4};
+const SUSP={ks:70,cs:9,Kx:420,Ky:170,Kh:.4};
 const BODY={h:0,hv:0,p:0,pv:0,r:0,rv:0};
 //                  a: +1 frente   b: +1 direita
 const WH=[{n:'fl',a:1,b:-1},{n:'fr',a:1,b:1},{n:'rl',a:-1,b:-1},{n:'rr',a:-1,b:1}].map(w=>({...w,z:0,zp:0,spin:0,imp:0,impT:9}));
 const WR=.30;                                     // raio da roda em metros (para o giro)
-let spdPrev=0,rough=0,slip=0,holdT=0,holdDir=0,lvl=0;
+let spdPrev=0,rough=0,slip=0,holdT=0,holdDir=0,lvl=0,vxl=0,sigDir=0,sigT=0,lightsOn=true,hazard=false,popFlash=0;
 const yAt=z=>{const s0=segAt(z),s1=segAt(z+SEG),f=((z%SEG)+SEG)%SEG/SEG;return s0.y+(s1.y-s0.y)*f};
 function curbStep(px,side){const e=side*px-.95;return e<=0?0:Math.min(1,e/.12)*2.4}  // meio-fio ~2,4 px
 function physics(dt,sg,pct){
@@ -399,7 +408,7 @@ function physics(dt,sg,pct){
   }
   const n=3,h=dt/n;
   for(let k=0;k<n;k++){
-    let Fh=hillF,Fp=SUSP.Kx*ax+0,Fr=SUSP.Ky*ay,sh=0,sp=0,sr=0;
+    let Fh=hillF-SUSP.ks*.9*pct*pct,Fp=SUSP.Kx*ax+0,Fr=SUSP.Ky*ay-35*ax,sh=0,sp=0,sr=0;   // aerodinamica abaixa o carro; torque do motor rola a carroceria
     for(const w of WH){
       const hi=BODY.h+w.a*BODY.p+w.b*BODY.r,hv=BODY.hv+w.a*BODY.pv+w.b*BODY.rv;
       const F=SUSP.ks*(w.z-hi)+SUSP.cs*(w.zp-hv);sh+=F;sp+=w.a*F;sr+=w.b*F;
@@ -413,6 +422,62 @@ function physics(dt,sg,pct){
 // peca do carro: troca de marcha sacode a arfagem
 function physKick(p){BODY.pv+=p}
 
+
+// ---------- iluminacao e escapamento ----------
+const mkG=rgb=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');
+  const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba('+rgb+',1)');gr.addColorStop(.25,'rgba('+rgb+',.55)');gr.addColorStop(1,'rgba('+rgb+',0)');g.fillStyle=gr;g.fillRect(0,0,64,64);return c};
+const GLW={red:mkG('255,40,35'),amb:mkG('255,168,40'),wht:mkG('255,244,214'),org:mkG('255,150,40')};
+const glow=(img,x,y,r,a)=>{ctx.globalAlpha=a;ctx.drawImage(img,Math.round(x-r),Math.round(y-r),Math.round(2*r),Math.round(2*r))};
+// pontos de luz e escapamento em cada vista (coordenadas do sprite na escala do jogo); L/R = lado do carro
+const LT={
+  c: {L:[21.5,33.8],R:[74.8,33.8],aL:[12.5,34],aR:[83.5,34],ex:[[22.5,56],[27.5,56.5]],exd:[0,9]},
+  l2:{L:[11,32],R:[52,32],ex:[[9,53],[12.5,53]],exd:[-11,5]},
+  r2:{L:[100,32],R:[138,31],ex:[[105,54.5],[110,54.5]],exd:[11,5]},
+  l3:{R:[6,30.5],HR:[173,37.5],aR:[162,36.5],ex:[[6,55]],exd:[-20,-3]},
+  r3:{L:[195,30.5],HL:[28,37.5],aL:[39,36.5],ex:[[195,55]],exd:[20,-3]}
+};
+const SMX=[];
+function beams(cxp,cyb){          // farois iluminando a pista a frente (poças de luz na rua molhada)
+  if(!lightsOn)return;
+  const pc=spd/MAXSPD,sh=slip*34;
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  for(const sd of[-1,1]){
+    const bx=cxp+sd*13+sh;
+    for(const [dy,r,a] of[[66,34,.34],[96,28,.22],[124,20,.13],[148,13,.08]]){
+      ctx.save();ctx.translate(bx,cyb-dy);ctx.scale(1,.36);glow(GLW.wht,0,0,r,a);ctx.restore();
+    }
+  }
+  ctx.restore();ctx.globalAlpha=1;
+}
+function lights(ks,dx0,dy0,g){
+  const T=LT[ks],pc=spd/MAXSPD,brake=!!(key.b||(key.d&&pc>.2)),blink=Math.floor(t*3)%2===0;
+  const P=pt=>[dx0+g.ox+pt[0],dy0+g.oy+pt[1]-g.up];
+  const sigL=hazard||(sigT>0&&sigDir<0),sigR=hazard||(sigT>0&&sigDir>0);
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  for(const side of['L','R']){
+    if(!T[side])continue;const [x,y]=P(T[side]);
+    const on=lightsOn?(brake?1:.5):(brake?1:.22);
+    // rastro de luz: a lanterna deixa um risco vermelho na pista, maior com a velocidade
+    if(pc>.05){const len=8+pc*46,gr=ctx.createLinearGradient(0,y,0,y+len);gr.addColorStop(0,'rgba(255,50,40,'+(.5*on)+')');gr.addColorStop(1,'rgba(255,50,40,0)');
+      ctx.globalAlpha=1;ctx.fillStyle=gr;ctx.fillRect(Math.round(x-1),Math.round(y+3),2,Math.round(len))}
+    glow(GLW.red,x,y,brake?15:9,on*.8);
+    if((side==='L'?sigL:sigR)&&blink){const a=(side==='L'?T.aL:T.aR)||T[side];const [ax2,ay2]=P(a);glow(GLW.amb,ax2,ay2,12,.95)}
+  }
+  // farol dianteiro (visivel nas vistas laterais)
+  for(const side of['L','R']){const h=T['H'+side];if(!h||!lightsOn)continue;const [x,y]=P(h);glow(GLW.wht,x,y,14,.9);glow(GLW.wht,x,y,6,.9)}
+  ctx.restore();ctx.globalAlpha=1;
+  // escapamento: fumaca (mais forte acelerando) e labareda do pipoco
+  const rate=4+16*thr+pc*6;
+  for(const e of T.ex){const [x,y]=P(e);
+    if(Math.random()<rate*dtLast)SMX.push({x:x+(Math.random()-.5),y,vx:T.exd[0]*(.6+Math.random()*.6),vy:T.exd[1]*(.6+Math.random()*.6),l:.5+Math.random()*.5,s:1+Math.random()});
+    if(popFlash>0){ctx.save();ctx.globalCompositeOperation='lighter';glow(GLW.org,x+T.exd[0]*.25,y+T.exd[1]*.25,9,.95);glow(GLW.wht,x+T.exd[0]*.15,y+T.exd[1]*.15,4,.9);ctx.restore();ctx.globalAlpha=1}
+  }
+  popFlash=Math.max(0,popFlash-dtLast);
+  for(let i=SMX.length-1;i>=0;i--){const q=SMX[i];q.l-=dtLast;if(q.l<=0||SMX.length>120){SMX.splice(i,1);continue}
+    q.x+=q.vx*dtLast;q.y+=q.vy*dtLast;q.s+=5*dtLast;
+    ctx.globalAlpha=Math.min(1,q.l*2)*.35;ctx.fillStyle='#b9bfd0';ctx.fillRect(Math.round(q.x-q.s/2),Math.round(q.y-q.s/2),Math.round(q.s),Math.round(q.s))}
+  ctx.globalAlpha=1;
+}
 // ---------- desenho ----------
 const rect=(x,y,w,h)=>ctx.fillRect(Math.round(x),y,Math.max(1,Math.round(w)),h);
 function drawRow(y,xc,hw,s,n,tt){
@@ -498,9 +563,11 @@ function render(){
   if(rigReady&&RIG[ks]){
     const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-34;
     const dx0=Math.round(cxp-CVW/2),dy0=cyb-(100-10);
+    beams(cxp,cyb);
     ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-g.w/2+6,cyb-3,g.w-12,5);
     ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb+2);ctx.scale(1,-1);ctx.drawImage(CARCV,dx0,dy0);ctx.restore();
     ctx.drawImage(CARCV,dx0,dy0);
+    lights(ks,dx0,dy0,g);
     spray(dx0,dy0,ks);window.__carpos={dx0,dy0};
   }else if(loaded>=5&&CAR[ks].complete){
     const im=CAR[ks],cxp=W/2+Math.round(steer*4),cyb=H-34;
@@ -539,8 +606,8 @@ const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};
   const off=()=>{key[k]=0;b.classList.remove('on')};
   b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off))};
-hold('bl','l');hold('br','r');hold('bb','b');hold('ba','a');
-const km={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowDown:'b',s:'b',S:'b',ArrowUp:'a',w:'a',W:'a'};
+hold('bl','l');hold('br','r');hold('bb','b');hold('ba','a');hold('bd','d');
+const km={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowDown:'b',s:'b',S:'b',ArrowUp:'a',w:'a',W:'a',' ':'d'};
 addEventListener('keydown',e=>{if(km[e.key]){key[km[e.key]]=1;msg.style.opacity=0;e.preventDefault()}});
 addEventListener('keyup',e=>{if(km[e.key])key[km[e.key]]=0});
 // toque no palco: metade esquerda/direita
@@ -550,5 +617,6 @@ let tk=null;
 st.addEventListener('pointerdown',e=>{tk=side(e);key[tk]=1;msg.style.opacity=0});
 ['pointerup','pointercancel','pointerleave'].forEach(ev=>st.addEventListener(ev,()=>{if(tk){key[tk]=0;tk=null}}));
 const tg=(id,fn)=>{const b=document.getElementById(id);b.onclick=()=>{const v=fn();b.classList.toggle('on',v);b.setAttribute('aria-pressed',v)}};
-tg('tf',()=>filt=!filt);tg('ts',()=>{soundOn=!soundOn;return soundOn});tg('tr',()=>rainOn=!rainOn);
+tg('tf',()=>filt=!filt);tg('tl',()=>lightsOn=!lightsOn);tg('th',()=>hazard=!hazard);
+addEventListener('keydown',e=>{if(e.key==='l'||e.key==='L')document.getElementById('tl').click();if(e.key==='h'||e.key==='H')document.getElementById('th').click()});tg('ts',()=>{soundOn=!soundOn;return soundOn});tg('tr',()=>rainOn=!rainOn);
 </script>
