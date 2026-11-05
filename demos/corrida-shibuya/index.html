@@ -153,6 +153,53 @@ const SKYLINE=(()=>{const w=960,h=120,c=mk(w,h),g=c.getContext('2d'),r=rng(21);
 const RAIN=Array.from({length:110},(_,i)=>({x:Math.random()*W,y:Math.random()*H,v:240+Math.random()*180,l:4+Math.random()*6,a:.25+Math.random()*.35}));
 
 // ---------- carro ----------
+const RIG={};let rigReady=false;
+fetch('img/rig/rig.json').then(r=>r.json()).then(meta=>{
+  const jobs=[];
+  for(const k in meta){const m=meta[k],o={m,body:new Image(),well:new Image(),wh:{}};RIG[k]=o;
+    const load=(im,src)=>jobs.push(new Promise(ok=>{im.onload=ok;im.onerror=ok;im.src=src}));
+    load(o.body,'img/rig/'+k+'_body.png');load(o.well,'img/rig/'+k+'_well.png');
+    for(const r of m.rodas){const w={r,img:new Image(),face:null};o.wh[r.nome]=w;load(w.img,'img/rig/'+k+'_wheel_'+r.nome+'.png');
+      if(r.face){w.face=new Image();load(w.face,'img/rig/'+k+'_face_'+r.nome+'.png')}}}
+  Promise.all(jobs).then(()=>{rigReady=true});
+}).catch(()=>{});
+const CARCV=document.createElement('canvas');CARCV.width=190;CARCV.height=100;const cg=CARCV.getContext('2d');
+const wheelScr={};
+const CORNER={c:{rl:2,rr:3},l2:{r:3,f:1},r2:{r:2,f:0}};
+function drawRig(k){
+  const R=RIG[k],m=R.m,B=BODY,ox=Math.round((190-m.w)/2),oy=100-m.h-10;
+  cg.clearRect(0,0,190,100);cg.imageSmoothingEnabled=false;
+  const roll=k==='c',front=k==='l2'?1:-1;
+  const ang0=roll?-Math.atan2(2*B.r,m.w*.8):-front*Math.atan2(2*B.p,90),ang=clamp(ang0,-.035,.035);
+  const up=roll?B.h-B.p:B.h+(k==='l2'?B.r:-B.r)*.4-B.p*.3;
+  const bodyT=()=>{cg.translate(ox+m.w/2,oy+m.h);cg.rotate(ang);cg.translate(0,-up);cg.translate(-m.w/2,-m.h)};
+  cg.save();bodyT();cg.drawImage(R.well,0,0);cg.restore();
+  for(const nm in R.wh){
+    const w=R.wh[nm],ph=WH[CORNER[k][nm]],r=w.r,zy=Math.round(ph.z);
+    cg.drawImage(w.img,ox+r.x,oy+r.y-zy);
+    if(w.face){
+      const f=r.face,dir=k==='l2'?1:-1,sp=ph.spin*dir,step=Math.abs(dtLast*(spd/MAXSPD*KMH/3.6)/WR);
+      cg.save();cg.imageSmoothingEnabled=true;cg.translate(ox+f.cx,oy+f.cy-zy);cg.rotate(f.tilt*Math.PI/180);cg.scale(f.a/f.b,1);
+      if(step>.3){const N=5;for(let j=0;j<N;j++){cg.save();cg.rotate(sp+dir*j*(2*Math.PI/7)/N);cg.globalAlpha=.3;cg.drawImage(w.face,-f.S/2,-f.S/2);cg.restore()}}
+      else{cg.rotate(sp);cg.drawImage(w.face,-f.S/2,-f.S/2)}
+      cg.restore();
+    }
+    wheelScr[k+nm]={x:ox+r.x+r.w/2,y:oy+r.y+r.h-zy};
+  }
+  cg.save();bodyT();cg.drawImage(R.body,0,0);cg.restore();
+  return {ox,oy,w:m.w,h:m.h};
+}
+let dtLast=1/60;
+const SPR=[];
+function spray(dx0,dy0,ks){
+  const pc=spd/MAXSPD;
+  if(pc>.08)for(const kk of(ks==='c'?['crl','crr']:[ks+'r'])){const p=wheelScr[kk];if(!p)continue;
+    for(let i=0,n=Math.round(pc*3+Math.random());i<n;i++)SPR.push({x:dx0+p.x+(Math.random()-.5)*8,y:dy0+p.y-3,vx:(Math.random()-.5)*34,vy:-(18+Math.random()*50)*pc,l:.45+Math.random()*.25})}
+  for(let i=SPR.length-1;i>=0;i--){const q=SPR[i];q.l-=dtLast;if(q.l<=0||SPR.length>400){SPR.splice(i,1);continue}
+    q.vy+=160*dtLast;q.x+=q.vx*dtLast;q.y+=q.vy*dtLast;
+    ctx.globalAlpha=Math.min(1,q.l*2.2)*.55;ctx.fillStyle='#c5d6ff';ctx.fillRect(Math.round(q.x),Math.round(q.y),1,q.vy<0?2:1)}
+  ctx.globalAlpha=1;
+}
 const CAR={};let loaded=0;
 ['c','r1','r2','l1','l2'].forEach(k=>{const im=new Image();im.onload=()=>{loaded++};im.src='img/car_'+k+'.png';CAR[k]=im});
 
@@ -211,7 +258,7 @@ function update(dt){
   if(key.b)spd+=BRK*dt;else if(key.a)spd+=accel(spd/MAXSPD)*dt;else spd+=DEC*dt;
   if(off&&spd>OFFL)spd+=OFFD*dt;
   px=clamp(px,-2.2,2.2);spd=clamp(spd,0,MAXSPD);
-  engine(dt);hud.innerHTML=Math.round(spd/MAXSPD*KMH)+'<small>km/h</small><br>'+Math.round(rpm/10)*10+'<small>rpm · '+(gear+1)+'ª</small>';
+  physics(dt,sg,pct);engine(dt);hud.innerHTML=Math.round(spd/MAXSPD*KMH)+'<small>km/h</small><br>'+Math.round(rpm/10)*10+'<small>rpm · '+(gear+1)+'ª</small>';
 }
 
 
@@ -219,7 +266,7 @@ function update(dt){
 // A gravacao foi cortada em 8 fatias de rotacao fixa (s0 grave ... s7 agudo) + marcha lenta + corte de giro.
 // O jogo mistura as duas fatias vizinhas conforme a rotacao e ajusta o tom so um pouco (maximo ~15%).
 const KMH=180;                                    // velocidade maxima por enquanto
-const GEARMAX=[48,78,108,142,185];                // km/h na rotacao maxima de cada marcha
+const GEARMAX=[48,78,108,142,180];                // km/h na rotacao maxima de cada marcha
 const RPMHI=7700,RPM0=2880;                       // corte de giro; rotacao da fatia mais grave
 const FSL=[28.0,31.6,35.4,39.9,44.9,50.5,56.9,64.0]; // tom (Hz) medido em cada fatia
 const HZ_PER_RPM=FSL[0]/RPM0;
@@ -231,8 +278,8 @@ function engine(dt){
   if(shiftT>0)shiftT-=dt;
   else{
     const r=v/GEARMAX[gear]*RPMHI;
-    if(r>7300&&gear<4){gear++;shiftT=.45;ev.push('f_shift')}
-    else if(gear>0&&r<3000){gear--;shiftT=.3;ev.push('f_blip')}
+    if(r>7300&&gear<4){gear++;shiftT=.45;ev.push('f_shift');physKick(-6)}
+    else if(gear>0&&r<3000){gear--;shiftT=.3;ev.push('f_blip');physKick(4)}
   }
   const base=Math.max(900,v/GEARMAX[gear]*RPMHI);
   const target=(v<8&&key.a)?3400:base;
@@ -280,6 +327,8 @@ function audioUpdate(){
   const hi=clamp((rpm-6400)/1100,0,1),hs=hi*hi*(3-2*hi),lim=(rpm>RPMHI-130&&thr>.3)?1:0;
   for(const k in w)if(k[0]==='s')w[k]*=1-.7*hs;
   w.f_acc=Math.sqrt(hs)*(1-lim);w.f_lim=lim;rt.f_acc=clamp(rpm/6400,.9,1.2);
+  // no limite (velocidade final): corte de giro + pipocos aleatorios, que tambem sacodem o carro
+  if(lim&&on){if(!(A.nextPop>T))A.nextPop=T+.3;if(T>=A.nextPop){oneShot(Math.random()<.35?'f_pop':'f_blip',.55+Math.random()*.45);A.nextPop=T+.25+Math.random()*.7;physKick(1.6)}}
   let m=on*(.45+.55*thr);                               // pe no acelerador = som cheio; sem acelerar = freio-motor
   if(shiftT>0&&gear>0)m*=.15;                           // embreagem: corte rapido do som na troca
   for(const k in A.L){
@@ -290,6 +339,52 @@ function audioUpdate(){
   A.lp.frequency.setTargetAtTime(2200+thr*13800,T,.08);
 }
 ['pointerdown','keydown'].forEach(ev2=>addEventListener(ev2,initAudio));
+
+// ---------- FISICA DO CARRO (independente da arte) ----------
+// Modelo de 3 graus de liberdade com 4 rodas: altura (h), arfagem (p) e rolagem (r) do corpo, cada roda com sua
+// propria entrada de pista (lombadas, meio-fio, calcada, buracos) e giro proprio (spin). Unidades: px do sprite, y para cima.
+// Esta parte nao depende de canvas/HTML: pode ser portada para Godot/Unity.
+const SUSP={ks:70,cs:9,Kx:340,Ky:150,Kh:.4};
+const BODY={h:0,hv:0,p:0,pv:0,r:0,rv:0};
+//                  a: +1 frente   b: +1 direita
+const WH=[{n:'fl',a:1,b:-1},{n:'fr',a:1,b:1},{n:'rl',a:-1,b:-1},{n:'rr',a:-1,b:1}].map(w=>({...w,z:0,zp:0,spin:0,imp:0,impT:9}));
+const WR=.30;                                     // raio da roda em metros (para o giro)
+let spdPrev=0,rough=0;
+const yAt=z=>{const s0=segAt(z),s1=segAt(z+SEG),f=((z%SEG)+SEG)%SEG/SEG;return s0.y+(s1.y-s0.y)*f};
+function curbStep(px,side){const e=side*px-.95;return e<=0?0:Math.min(1,e/.12)*2.4}  // meio-fio ~2,4 px
+function physics(dt,sg,pct){
+  const ax=(spd-spdPrev)/Math.max(dt,1e-3)/MAXSPD;spdPrev=spd;
+  const ay=clamp(steer*pct*.9+sg.curve*pct*pct*.25,-1.2,1.2);
+  const curv=(yAt(pos+SEG)-2*yAt(pos)+yAt(pos-SEG))/(SEG*SEG);
+  const hillF=clamp(-curv*spd*spd*SUSP.Kh,-190,190);
+  // lombadas/buracos pontuais da pista (tampas de bueiro e faixas pintadas), roda a roda
+  if(sg.i!==physics.last){physics.last=sg.i;
+    if(sg.i%29===7||sg.cw&&sg.i%110===100){const side=(sg.i%2?1:-1);for(const w of WH)if(w.b===side||sg.cw){w.impT=-(w.a>0?0:.07+.02*(1-pct))}}}
+  const off=Math.abs(px)>.95;
+  for(const w of WH){
+    let r=0;
+    r+=curbStep(px,w.b);                                              // meio-fio
+    if(Math.abs(px)>1.05&&w.b*px>0)r+=(Math.random()-.5)*2.2*pct;      // calcada: trepidacao
+    r+=(Math.random()-.5)*.5*pct;                                      // asfalto molhado
+    w.impT+=dt;if(w.impT>=0&&w.impT<.1)r+=1.8*Math.sin(w.impT/.1*Math.PI);   // lombada passando por esta roda
+    w.zp=(r-w.z)*28;w.z+=w.zp*dt;                                      // roda segue a pista (pneu)
+    w.spin+=dt*(spd/MAXSPD*KMH/3.6)/WR;                                // giro: v / raio
+  }
+  const n=3,h=dt/n;
+  for(let k=0;k<n;k++){
+    let Fh=hillF,Fp=SUSP.Kx*ax+0,Fr=SUSP.Ky*ay,sh=0,sp=0,sr=0;
+    for(const w of WH){
+      const hi=BODY.h+w.a*BODY.p+w.b*BODY.r,hv=BODY.hv+w.a*BODY.pv+w.b*BODY.rv;
+      const F=SUSP.ks*(w.z-hi)+SUSP.cs*(w.zp-hv);sh+=F;sp+=w.a*F;sr+=w.b*F;
+    }
+    BODY.hv+=(Fh+sh/4)*h;BODY.h+=BODY.hv*h;
+    BODY.pv+=(Fp+sp/4)*h;BODY.p+=BODY.pv*h;
+    BODY.rv+=(Fr+sr/4)*h;BODY.r+=BODY.rv*h;
+  }
+  BODY.h=clamp(BODY.h,-4,4);BODY.p=clamp(BODY.p,-4,4);BODY.r=clamp(BODY.r,-4,4);
+}
+// peca do carro: troca de marcha sacode a arfagem
+function physKick(p){BODY.pv+=p}
 
 // ---------- desenho ----------
 const rect=(x,y,w,h)=>ctx.fillRect(Math.round(x),y,Math.max(1,Math.round(w)),h);
@@ -369,15 +464,17 @@ function render(){
       ctx.drawImage(sp.t.f[fog],0,0,sp.t.w,sh,Math.round(dX),Math.round(dY),Math.ceil(dw),Math.ceil(dh-ch));
     }
   }
-  // carro + reflexo
+  // carro (corpo + rodas separadas pela fisica) + reflexo
   const ks=steer>.3?'l2':steer<-.3?'r2':'c';
-  const im=CAR[ks];
-  if(loaded>=5&&im.complete){
-    const bob=spd>0?Math.round(Math.sin(t*38)*(spd/MAXSPD)*.7):0;
-    const cxp=W/2+Math.round(steer*4),cyb=H-34+bob;
-    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-im.width/2+4,cyb-3,im.width-8,5);
-    ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb);ctx.scale(1,-1);
-    ctx.drawImage(im,Math.round(cxp-im.width/2),cyb-im.height+4);ctx.restore();
+  if(rigReady&&RIG[ks]){
+    const g=drawRig(ks),cxp=W/2+Math.round(steer*4),cyb=H-34;
+    const dx0=Math.round(cxp-95),dy0=cyb-(100-10);
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-g.w/2+6,cyb-3,g.w-12,5);
+    ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb+2);ctx.scale(1,-1);ctx.drawImage(CARCV,dx0,dy0);ctx.restore();
+    ctx.drawImage(CARCV,dx0,dy0);
+    spray(dx0,dy0,ks);window.__carpos={dx0,dy0};
+  }else if(loaded>=5&&CAR[ks].complete){
+    const im=CAR[ks],cxp=W/2+Math.round(steer*4),cyb=H-34;
     ctx.drawImage(im,Math.round(cxp-im.width/2),cyb-im.height);
   }
   // chuva
@@ -401,13 +498,13 @@ function post(){
 }
 // ---------- loop ----------
 function step(dt){
-  t+=dt;update(dt);
+  t+=dt;dtLast=dt;update(dt);
   for(const d of RAIN){d.y+=d.v*dt;d.x-=d.v*dt*.18;if(d.y>H){d.y=-8;d.x=Math.random()*W*1.2}if(d.x<0)d.x+=W}
 }
 let last=performance.now();
 function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;step(dt);render();requestAnimationFrame(tick)}
 requestAnimationFrame(tick);
-window.__test={step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
+window.__test={BODY,WH,step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
 // ---------- controles ----------
 const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};
