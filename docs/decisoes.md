@@ -38,3 +38,8 @@
 - Anti-lag (liga/desliga): ao soltar o acelerador em rotação alta, a rotação cai devagar com pipocos e labareda; também nas trocas.
 - Câmera de fora mais perto: carro 1,5x maior.
 - Linhas de velocidade em ambas as câmeras, crescem com a velocidade.
+
+## Controles em ícones e efeito de velocidade (06/11)
+- Layout sem rolagem (cabe na tela em pé e deitado), botões só com ícones, polegares embaixo (esquerda: virar e marcha; direita: freio, acelerar, freio de mão, nitro); ícones pequenos no topo (câmera 1ª pessoa, faróis, pisca, limpador, desembaçar, câmbio M, anti-lag, filtro, chuva, som).
+- Alavanca de câmbio desenhada no cockpit (padrão em H, mostra a marcha); a mão direita vai até ela.
+- Acima de 100 km/h: tremor de câmera, zoom (FOV), embaçado radial nas bordas e linhas de velocidade. Protótipo do CapCut dele fica para depois.

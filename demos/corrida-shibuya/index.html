@@ -1,76 +1,59 @@
+<meta charset="utf-8">
 <title>Corrida Shibuya</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: palco 16:9 pixel-art em cima, controles de toque embaixo. Visual unico: noite chuvosa de Shibuya. */
-:root{
-  --bg:#080b18; --panel:#10152a; --fg:#e9ecff; --muted:#8c93b8; --line:#242b4d;
-  --neon:#ff4fa3; --cyan:#4fd8ff; --amber:#ffd24f;
-  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow","Segoe UI",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
-  color-scheme:dark;
-}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;
-  padding-block:16px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.wrap{max-width:960px;margin:0 auto;display:grid;gap:12px}
-header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
-h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,6vw,40px);letter-spacing:.03em;text-transform:uppercase;margin:0;line-height:1}
-h1 b{color:var(--neon);font-weight:700}
-.sub{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
-.stage{position:relative;aspect-ratio:16/9;max-width:100%;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#0a0f24;touch-action:none;user-select:none;-webkit-user-select:none}
+:root{--bg:#080b18;--panel:#141a33;--fg:#e9ecff;--muted:#8c93b8;--line:#2a3260;--neon:#ff4fa3;--cyan:#4fd8ff;--amber:#ffd24f;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;overflow:hidden;overscroll-behavior:none}
+.app{height:100dvh;display:flex;flex-direction:column;gap:8px;padding:6px max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.stage{position:relative;flex:0 0 auto;width:100%;aspect-ratio:16/9;max-height:46dvh;margin:0 auto;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0a0f24;touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
-.hud{position:absolute;right:10px;top:8px;font-family:var(--mono);font-size:clamp(12px,2.6vw,18px);color:var(--fg);text-shadow:0 0 6px var(--neon);letter-spacing:.04em;font-variant-numeric:tabular-nums}
-.hud small{color:var(--muted);font-size:.7em;margin-left:4px}
-.msg{position:absolute;left:10px;bottom:8px;font-family:var(--mono);font-size:12px;color:var(--muted);transition:opacity .5s}
-.pad{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.pad .wide{grid-column:1/-1}
-button{font:inherit;font-weight:600;min-height:56px;padding:0 16px;border-radius:4px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
-button:active,button.on{background:var(--neon);color:#1a0612;border-color:var(--neon)}
-button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-.row button{min-height:44px;font-weight:500;font-size:14px;flex:1 1 140px}
-.row button.on{background:var(--cyan);border-color:var(--cyan);color:#04141a}
-.note{font-size:14px;color:var(--muted);margin:0;max-width:70ch}
-.note b{color:var(--fg);font-weight:600}
+.hud{position:absolute;right:8px;top:6px;font-family:ui-monospace,monospace;font-size:clamp(11px,3vw,17px);text-shadow:0 0 6px var(--neon);font-variant-numeric:tabular-nums;text-align:right;pointer-events:none}
+.hud small{color:var(--muted);font-size:.7em;margin-left:3px}
+.msg{position:absolute;left:8px;bottom:6px;font-family:ui-monospace,monospace;font-size:10px;color:var(--muted);transition:opacity .5s;pointer-events:none}
+.ctl{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.tg{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.main{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.gl,.gr{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{display:grid;place-items:center;padding:0;border-radius:14px;border:1.5px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
+button svg{width:55%;height:55%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.tg button{width:46px;height:46px;border-radius:50%}
+.gl button,.gr button{height:clamp(64px,13dvh,92px)}
+button:active,button.on{background:var(--neon);border-color:var(--neon);color:#1a0612}
+.tg button.on{background:var(--cyan);border-color:var(--cyan);color:#04141a}
+#tv.on{background:var(--amber);border-color:var(--amber);color:#201600}
+#ba{background:#12301f;border-color:#2fbf6a;color:#6dffa6}#ba:active{background:#2fbf6a;color:#04200f}
+#bb{background:#33141a;border-color:#d4465a;color:#ff8c9b}#bb:active{background:#d4465a;color:#2a0509}
+.nitro{background:linear-gradient(90deg,#1b5cff calc(var(--t,1)*100%),#141a33 0);border-color:#4a7bff;color:#cfe0ff}
+.wide{grid-column:1/-1}
+@media (orientation:landscape) and (max-height:600px){
+  .app{display:block;position:relative;padding:0}
+  .stage{height:100dvh;width:auto;max-height:none;max-width:100vw;border:0;border-radius:0}
+  .ctl{position:absolute;inset:0;display:block;pointer-events:none}
+  .ctl button{pointer-events:auto;background:rgba(16,21,42,.55);backdrop-filter:blur(2px)}
+  .tg{position:absolute;left:8px;top:8px;width:auto;max-width:50%;justify-content:flex-start;gap:6px}
+  .tg button{width:38px;height:38px}
+  .main{position:absolute;inset:auto 10px 10px 10px;display:flex;justify-content:space-between}
+  .gl,.gr{width:auto}.gl button,.gr button{width:68px;height:62px}
+  .gl,.gr{grid-template-columns:repeat(2,auto)}
+}
+@media (pointer:coarse){.msg{display:none}}
 @media (prefers-reduced-motion:reduce){.msg{transition:none}}
-.nitro{background:linear-gradient(90deg,#1b5cff calc(var(--t,1)*100%),#1b1d2c 0);border-color:#4a7bff}
 </style>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 
-<div class="wrap">
-  <header>
-    <h1>Corrida <b>Shibuya</b></h1>
-    <span class="sub">protótipo da pista · câmera estilo Top Gear</span>
-  </header>
-
+<div class="app">
   <div class="stage" id="stage">
     <canvas id="c" aria-label="Carro laranja correndo numa rua de Shibuya à noite, na chuva"></canvas>
     <div class="hud" id="hud">0<small>km/h</small></div>
-    <div class="msg" id="msg">◀ ▶ ou setas/A/D para guiar · ↑/W acelera · ↓/S freia</div>
+    <div class="msg" id="msg">teclado: setas/WASD · Espaço freio de mão · N nitro · E/Z marcha · C câmera</div>
   </div>
-
-  <div class="pad">
-    <button id="bl" aria-label="Virar para a esquerda">◀ Esquerda</button>
-    <button id="br" aria-label="Virar para a direita">Direita ▶</button>
-    <button id="ba" aria-label="Acelerar">Acelerar</button>
-    <button id="bb" aria-label="Frear">Frear</button>
-    <button id="bd" class="wide" aria-label="Drift (freio de mão)">Drift · freio de mão</button>
-    <button id="gd" aria-label="Reduzir marcha">Marcha − (Z)</button>
-    <button id="gu" aria-label="Subir marcha">Marcha + (E)</button>
-    <button id="bn" class="wide nitro" aria-label="Nitro">⚡ NITRO</button>
+  <div class="ctl">
+    <div class="tg"><button id="tv" class="" title="Câmera 1ª pessoa (C)" aria-label="Câmera 1ª pessoa (C)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8h3.5l2-3h6l2 3h3.5v11h-17z"/><circle cx="12" cy="13" r="3.6"/></svg></button><button id="tl" class=" on" title="Faróis (L)" aria-label="Faróis (L)" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5h6M10 21h4M12 3a6 6 0 00-3.5 10.8V16h7v-2.2A6 6 0 0012 3z"/></svg></button><button id="th" class="" title="Pisca-alerta (H)" aria-label="Pisca-alerta (H)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.2"/></svg></button><button id="tw" class="" title="Limpador (Q)" aria-label="Limpador (Q)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18a9 9 0 0118 0M12 18l5.5-9"/></svg></button><button id="td" class="" title="Desembaçar" aria-label="Desembaçar" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7c2-2 3 2 5 0s3 2 5 0 3 2 5 0M4 12c2-2 3 2 5 0s3 2 5 0 3 2 5 0M4 17c2-2 3 2 5 0s3 2 5 0 3 2 5 0"/></svg></button><button id="tg" class="" title="Câmbio manual" aria-label="Câmbio manual" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor" stroke="none">M</text></svg></button><button id="ta" class=" on" title="Anti-lag" aria-label="Anti-lag" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c1 4 6 5 6 10.5a6 6 0 01-12 0c0-2.200 1-3.500 2.500-4.500 0 2 1 3 2 3 0-4 0-6 1.500-9z"/></svg></button><button id="tf" class=" on" title="Filtro pixel-art" aria-label="Filtro pixel-art" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.500" height="6.500"/><rect x="13.500" y="4" width="6.500" height="6.500"/><rect x="4" y="13.500" width="6.500" height="6.500"/><rect x="13.500" y="13.500" width="6.500" height="6.500"/></svg></button><button id="tr" class=" on" title="Chuva" aria-label="Chuva" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14a4 4 0 010-8 5 5 0 019.500 1A3.500 3.500 0 0116.500 14zM9 17l-1 3.500M13 17l-1 3.500M17 17l-1 3.500"/></svg></button><button id="ts" class=" on" title="Som do motor" aria-label="Som do motor" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.500v5h4l5 4v-13l-5 4zM16 9a4 4 0 010 6M18.500 6a8 8 0 010 12"/></svg></button></div>
+    <div class="main">
+      <div class="gl"><button id="bl" class="" title="Virar à esquerda" aria-label="Virar à esquerda" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><button id="br" class="" title="Virar à direita" aria-label="Virar à direita" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button><button id="gd" class="" title="Reduzir marcha (Z)" aria-label="Reduzir marcha (Z)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5V7z"/><path d="M8.5 12h7"/></svg></button><button id="gu" class="" title="Subir marcha (E)" aria-label="Subir marcha (E)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5V7z"/><path d="M8.5 12h7M12 8.5v7"/></svg></button></div>
+      <div class="gr"><button id="bb" class="" title="Frear" aria-label="Frear" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="ba" class="" title="Acelerar" aria-label="Acelerar" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18l6-6 6 6M6 11l6-6 6 6"/></svg></button><button id="bd" class="" title="Freio de mão (drift)" aria-label="Freio de mão (drift)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M10.5 15V9h2.2a1.7 1.7 0 010 3.4h-2.2M3.5 8a9 9 0 000 8M20.5 8a9 9 0 010 8"/></svg></button><button id="bn" class="nitro" title="Nitro" aria-label="Nitro" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5L5 14h6l-1 7.5L19 10h-6z" fill="currentColor"/></svg></button></div>
+    </div>
   </div>
-  <div class="row">
-    <button id="tf" class="on" aria-pressed="true">Filtro pixel-art</button>
-    <button id="tr" class="on" aria-pressed="true">Chuva</button>
-    <button id="ts" class="on" aria-pressed="true">Som do motor</button>
-    <button id="tl" class="on" aria-pressed="true">Faróis</button>
-    <button id="th" aria-pressed="false">Pisca-alerta</button>
-    <button id="tg" aria-pressed="false">Câmbio manual</button>
-    <button id="ta" class="on" aria-pressed="true">Anti-lag</button>
-    <button id="tv" aria-pressed="false">Câmera: cockpit</button>
-    <button id="tw" aria-pressed="false">Limpador</button>
-    <button id="td" aria-pressed="false">Desembaçar</button>
-  </div>
-  <p class="note"><b>Como funciona:</b> a câmera fica fixa atrás do carro, como no Top Gear. A pista é desenhada em faixas que se entortam nas curvas e sobem e descem nas ladeiras. Os prédios, postes e placas são sprites que crescem ao chegar perto. O carro é a sua arte (traseira e 3/4); a cena foi desenhada por mim em código para seguir as suas referências de Shibuya.</p>
 </div>
 
 <script>
@@ -533,7 +516,8 @@ function drawRow(y,xc,hw,s,n,tt){
   if(f>.02){ctx.globalAlpha=f;ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,y,W,1);ctx.globalAlpha=1}
 }
 function render(){
-  const cab=view==='cab'&&ckReady;
+  const cab=view==='cab'&&ckReady,sp=clamp((vkmh()-100)/80,0,1),wfx=!cab&&sp>.01;
+  if(wfx){ctx.save();ctx.translate(W/2+(Math.random()-.5)*sp*1.8,H/2+(Math.random()-.5)*sp*1.8);const zk=1+.04*sp;ctx.scale(zk,zk);ctx.translate(-W/2,-H/2)}
   if(cab){ctx.save();const k=1+.035*nitro.k,sk=nitro.k*1.1;
     ctx.translate(W/2+cabWX+(Math.random()-.5)*sk,100+cabWY-35+(Math.random()-.5)*sk);ctx.rotate(cabRoll);ctx.scale(k,k);ctx.translate(-W/2,-100)}
   const base=segAt(pos),bp=(pos%SEG)/SEG;
@@ -584,13 +568,14 @@ function render(){
     }
   }
   nitroFx();
-  if(cab)ctx.restore();
+  if(cab||wfx)ctx.restore();
+  speedBlur(sp);
   // carro (corpo + rodas separadas pela fisica) + reflexo
   const m=Math.max(Math.abs(steer)*.55,Math.abs(slip)),sd=Math.abs(slip)>.05?Math.sign(slip):Math.sign(steer);
   let nl=Math.abs(slip)>(lvl===3?.45:.6)?3:(m>(lvl>=2?.2:.3)?2:0);lvl=nl;
   const ks=lvl===3?(sd>0?'l3':'r3'):lvl===2?(sd>0?'l2':'r2'):'c';
   if(cab){}else if(rigReady&&RIG[ks]){
-    const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-30;
+    const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-30+Math.round((Math.random()-.5)*sp*2);
     const dx0=Math.round(cxp-CVW/2),dy0=cyb-(100-10);
     ctx.save();ctx.translate(cxp,cyb);ctx.scale(CARS,CARS);ctx.translate(-cxp,-cyb);
     beams(cxp,cyb);
@@ -631,7 +616,7 @@ function post(){
 const CK={};let CKC=null,ckReady=false;
 fetch('img/cockpit/cockpit.json').then(r=>r.json()).then(c=>{CKC=c;return Promise.all(['bg','wheel','gloveL','gloveR','armL','armR'].map(n=>new Promise(res=>{const i=new Image();i.onload=()=>{CK[n]=i;res()};i.onerror=res;i.src='img/cockpit/'+n+'.png'})))}).then(()=>{ckReady=!!CK.bg}).catch(()=>{});
 GLW.grn=mkG('70,255,130');
-let wheelA=0,wheelV=0,hb=0,gs=0,cabX=0,cabY=0,cabWX=0,cabWY=0,cabRoll=0,armJx=0,armJy=0;
+let shP=[0,0],wheelA=0,wheelV=0,hb=0,gs=0,cabX=0,cabY=0,cabWX=0,cabWY=0,cabRoll=0,armJx=0,armJy=0;
 const shiftArm={t:0},wiper={on:false,ph:0},defog={on:false},fog={v:0},DROPS=[],radio={on:true,f:102.3};
 const WIPERS=[[175,150,112],[300,150,104]];
 function cabUpdate(dt){
@@ -662,6 +647,14 @@ function cabUpdate(dt){
   }
 }
 const wiperAng=()=>{const f=wiper.ph<1?wiper.ph:2-wiper.ph;return 176-158*(.5-.5*Math.cos(Math.PI*f))};
+const BL=mk(W,H),blg=BL.getContext('2d'),BM=(()=>{const c=mk(W,H),g=c.getContext('2d'),r=g.createRadialGradient(W/2,H/2,H*.22,W/2,H/2,H*.85);r.addColorStop(0,'rgba(0,0,0,0)');r.addColorStop(1,'rgba(0,0,0,1)');g.fillStyle=r;g.fillRect(0,0,W,H);return c})();
+function speedBlur(sp){   // embaçado radial nas bordas (zoom-blur) acima de 100 km/h
+  if(sp<.05)return;
+  blg.globalCompositeOperation='source-over';blg.clearRect(0,0,W,H);blg.imageSmoothingEnabled=true;
+  const z=1+.08*sp;blg.drawImage(cv,-W*(z-1)/2,-H*(z-1)/2,W*z,H*z);
+  blg.globalCompositeOperation='destination-in';blg.drawImage(BM,0,0);
+  ctx.save();ctx.globalAlpha=.6*sp;ctx.imageSmoothingEnabled=true;ctx.drawImage(BL,0,0);ctx.restore();ctx.imageSmoothingEnabled=false;
+}
 function nitroFx(){   // linhas de velocidade (crescem com a velocidade; azuis no nitro) + vinheta
   const pc=clamp(spd/MAXSPD,0,1.25),k=Math.max(nitro.k,clamp((pc-.3)/.7,0,1)*.8);
   if(k<.03)return;
@@ -714,7 +707,14 @@ function drawCab(){
   // volante (rigido com o eixo), antebraços esticados ate as luvas, luvas
   const th=wheelA*Math.PI/180,H0=C.hub,rot=(p,a)=>[H0[0]+(p[0]-H0[0])*Math.cos(a)-(p[1]-H0[1])*Math.sin(a),H0[1]+(p[0]-H0[0])*Math.sin(a)+(p[1]-H0[1])*Math.cos(a)];
   ctx.save();ctx.translate(H0[0],H0[1]);ctx.rotate(th);ctx.drawImage(CK.wheel,C.wheelBox[0]-H0[0],C.wheelBox[1]-H0[1]);ctx.restore();
-  const hbo=[Math.max(hb*22,gs*14),Math.max(hb*28,gs*20)];                              // mao direita solta o volante e puxa o freio de mao
+  const hbo=[Math.max(hb*22,gs*30),Math.max(hb*28,gs*26)];
+  const GX=[[-3,-3],[-3,3],[0,-3],[0,3],[3,-3]],tp=GX[gear];shP[0]+=(tp[0]-shP[0])*.3;shP[1]+=(tp[1]-shP[1])*.3;
+  {const bx=368,by=262,kx=bx+shP[0],ky=by-14+shP[1];
+   ctx.fillStyle='#0b0b0e';ctx.beginPath();ctx.ellipse(bx,by,7,3,0,0,6.3);ctx.fill();
+   ctx.strokeStyle='#000';ctx.lineWidth=3.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,by-1);ctx.lineTo(kx,ky);ctx.stroke();
+   ctx.strokeStyle='#3b3f4a';ctx.lineWidth=1.6;ctx.stroke();
+   ctx.fillStyle='#000';ctx.beginPath();ctx.arc(kx,ky,4.4,0,6.3);ctx.fill();ctx.fillStyle='#4a5266';ctx.beginPath();ctx.arc(kx,ky,3.5,0,6.3);ctx.fill();
+   ctx.fillStyle='#b4bdd2';ctx.fillRect(kx-2,ky-2.5,2,1);pxText(String(gear+1),kx-1,ky-2,'#ffb23a')}                              // mao direita solta o volante e puxa o freio de mao
   for(const [side,key2,gl] of [[-1,'armL','gloveL'],[1,'armR','gloveR']]){
     const a=C[key2],img=CK[key2],isR=side>0,off=isR?hbo:[0,0],ang=isR?th*(1-Math.max(hb,gs)*.7):th;
     const w0=a.wrist,wn0=rot(w0,ang);const Wn=[wn0[0]+off[0]+armJx*1.5,wn0[1]+off[1]+armJy*1.5];
