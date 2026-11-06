@@ -1,6 +1,6 @@
 """Converte o mapa Chicago (OBJ gigante) em blocos leves para o navegador.
-Uso: python3 converter_mapa.py <pasta com chicago_day_split.obj> <pasta textures PNG> <saida>
-Gera: atlas.png (2048), tiles.json, t_X_Y_K.bin (posicao int16, uv uint16, brilho uint8, indices uint16), grid.bin (altura/colisao)."""
+Uso: python3 converter_mapa.py <arquivo chicago_day_split.obj> <pasta textures PNG> <saida>
+Gera: atlas.png (2048), tiles.json, t_X_Z_K.wav (posicao uint16, uv uint16, brilho uint8, indices uint16; extensao .wav so por compatibilidade de publicacao), grid.wav (4 camadas de altura/colisao)."""
 import sys,json,os,re,struct,numpy as np
 from PIL import Image,ImageDraw
 OBJ,TEX,OUT=sys.argv[1:4]; os.makedirs(OUT,exist_ok=True)
@@ -29,7 +29,13 @@ for n,i in sorted(mats.items(),key=lambda x:x[1]):
     slot[i]=k
     if os.path.exists(f):atlas.paste(Image.open(f).convert('RGB'),((k%8)*256,(k//8)*256))
     k+=1
+ROOFSLOT=63 if k<=63 else k-1
+rx,ry=(ROOFSLOT%8)*256,(ROOFSLOT//8)*256
+rng=np.random.RandomState(1)
+blk=np.clip(np.array([58,60,70])+rng.randint(-5,6,(16,16,1)),0,255).astype(np.uint8)
+atlas.paste(Image.fromarray(np.repeat(np.repeat(blk,1,0),1,1)),(rx+120,ry+120))
 atlas.save(os.path.join(OUT,'atlas.png'),optimize=True)
+print('mats',k,'slot telhado',ROOFSLOT)
 # ---- vertices por canto (pos+uv atlas), brilho por normal
 P=V[FV]                                   # (n,3,3)
 nrm=np.cross(P[:,1]-P[:,0],P[:,2]-P[:,0]);ln=np.linalg.norm(nrm,axis=1);ok=ln>1e-12
@@ -49,13 +55,64 @@ def raster(idx,order):
         d.polygon([((p[0]-x0)/CELL,(p[2]-z0)/CELL) for p in P[t]],fill=float(P[t,:,1].mean()))
     return np.array(im)
 up=np.where((ny>.5))[0]
-low=raster(up,-1)
-low[low>1e8]=-9
-gridH=np.clip(np.round(low*1000),-32767,32767).astype(np.int16)
-gridH[low<=-9]=-32768
-gridH.tofile(os.path.join(OUT,'grid.wav'))
+NB=0.08;LAY=4
+hy=P[up,:,1].mean(1);band=np.floor((hy+0.5)/NB).astype(int)
+layers=np.full((LAY,GH,GW),-32768,np.int16);cnt=np.zeros((GH,GW),np.int8);last=np.full((GH,GW),-9.0)
+low=np.full((GH,GW),-9.0)
+for bd in np.unique(band):
+    r=raster(up[band==bd],1);valid=r>-8e8
+    r[~valid]=-9
+    if bd==np.unique(band)[0]:low=np.where(valid,r,low)
+    new_=valid&((last<-8)|(r-last>0.12))&(cnt<LAY)
+    for li in range(LAY):
+        m=new_&(cnt==li);layers[li][m]=np.round(r[m]*1000).astype(np.int16)
+    cnt=np.where(new_,cnt+1,cnt);last=np.where(new_,r,last)
+print('camadas por celula',[int((cnt==i).sum()) for i in range(LAY+1)])
+layers.tofile(os.path.join(OUT,'grid.wav'))
+# ---- telhados: celulas sem superficie virada pra cima (topo dos predios) ganham um teto na altura da parede mais proxima
+from scipy.ndimage import distance_transform_edt
+void=(cnt==0)
+vtop=np.full((GH,GW),-9.0)
+side=np.where(np.abs(ny)<=.5)[0]
+ix=np.clip(((P[side,:,0]-x0)/CELL).astype(int),0,GW-1).ravel();iz=np.clip(((P[side,:,2]-z0)/CELL).astype(int),0,GH-1).ravel();yy=P[side,:,1].ravel()
+np.maximum.at(vtop,(iz,ix),yy)
+src=(vtop>-8)&(~void)|((vtop>-8)&void)   # paredes dentro ou na borda
+d,(ii,jj)=distance_transform_edt(~(vtop>-8),return_indices=True)
+roofY=vtop[ii,jj]
+ground=np.where(cnt>0,layers[0]/1000.0,-9)
+roofvoid=void&(d<12)
+roofY=np.where(roofvoid,np.maximum(roofY,0.05),-9)
+# quads por corrida horizontal de mesma altura (quantizada)
+rq=np.round(roofY/0.04)*0.04
+RT=[]
+for r_ in range(GH):
+    row=rq[r_];c_=0
+    while c_<GW:
+        if not roofvoid[r_,c_]:c_+=1;continue
+        e=c_
+        while e+1<GW and e-c_<15 and roofvoid[r_,e+1] and row[e+1]==row[c_]:e+=1
+        RT.append((c_,e+1,r_,row[c_]));c_=e+1
+print('quads de telhado',len(RT))
+rt=np.array(RT,np.float64)
+xa=x0+rt[:,0]*CELL;xb=x0+rt[:,1]*CELL;za=z0+rt[:,2]*CELL;zb=za+CELL;yr=rt[:,3]+0.003
+n_r=len(rt)
+R0=np.stack([np.stack([xa,yr,za],1),np.stack([xb,yr,za],1),np.stack([xb,yr,zb],1)],1)
+R1=np.stack([np.stack([xa,yr,za],1),np.stack([xb,yr,zb],1),np.stack([xa,yr,zb],1)],1)
+# chao geral escuro sob o mapa inteiro (tampa buracos), em quadrados de 4 unidades
+GQ=4.0;gq=[]
+for gx in np.arange(x0,x1,GQ):
+    for gz in np.arange(z0,z1,GQ):
+        ex=min(gx+GQ,x1);ez=min(gz+GQ,z1)
+        A=(gx,-0.17,gz);B=(ex,-0.17,gz);C=(ex,-0.17,ez);D=(gx,-0.17,ez)
+        gq.append([A,B,C]);gq.append([A,C,D])
+gq=np.array(gq,np.float64)
+EXTRA=np.concatenate([R0,R1,gq])
+ru=(ROOFSLOT%8*256+128)/2048;rv=(ROOFSLOT//8*256+128)/2048
+P=np.concatenate([P,EXTRA]);n0=len(au)
+au=np.concatenate([au,np.full((len(EXTRA),3),ru)]);av=np.concatenate([av,np.full((len(EXTRA),3),rv)])
+shade=np.concatenate([shade,np.full(len(EXTRA),1.0)]);ok=np.concatenate([ok,np.ones(len(EXTRA),bool)])
 # ---- blocos
-cx=((P[:,:,0].mean(1)-x0)//T).astype(int);cz=((P[:,:,2].mean(1)-z0)//T).astype(int)
+cx=np.clip(((P[:,:,0].mean(1)-x0)//T).astype(int),0,None);cz=np.clip(((P[:,:,2].mean(1)-z0)//T).astype(int),0,None)
 tiles=[];tot=0
 for tx in range(cx.max()+1):
   for tz in range(cz.max()+1):
@@ -76,5 +133,5 @@ for tx in range(cx.max()+1):
         with open(os.path.join(OUT,name),'wb') as f:
             f.write(struct.pack('<II',nv,len(ind)));f.write(q.tobytes());f.write(qu.tobytes());f.write(qs.tobytes());f.write(b'\0'*((4-nv%4)%4));f.write(ind.tobytes())
         tiles.append(dict(f=name,tx=tx,tz=tz,mn=mn.round(5).tolist(),ext=ext.round(5).tolist(),nv=nv,ni=len(ind)));tot+=os.path.getsize(os.path.join(OUT,name))
-json.dump(dict(x0=x0,z0=z0,T=T,CELL=CELL,GW=GW,GH=GH,tiles=tiles),open(os.path.join(OUT,'tiles.json'),'w'))
+json.dump(dict(x0=x0,z0=z0,T=T,CELL=CELL,GW=GW,GH=GH,LAY=LAY,tiles=tiles),open(os.path.join(OUT,'tiles.json'),'w'))
 print('tiles',len(tiles),'bytes',tot,'grid',GW,GH)

@@ -260,24 +260,26 @@ const MAXSPD=SEG*60*.6,BRK=-MAXSPD/2.5,DEC=-MAXSPD/8,OFFD=-MAXSPD/2,OFFL=MAXSPD/
 // aceleracao em degrade: forte no comeco, suave perto do maximo (0 a 180 km/h em ~30 s)
 const accel=p=>MAXSPD*(.075*(1-p)+.0094);
 let pos=0,px=0,spd=0,steer=0,skyX=0,t=0,rainOn=true,filt=true;
-const CARS=1.5;const key={l:0,r:0,b:0,a:0,d:0,n:0};const nitro={on:false,tank:1,k:0};
+const CARS=1.5,CARW=.62;let pitS=0;const key={l:0,r:0,b:0,a:0,d:0,n:0};const nitro={on:false,tank:1,k:0};
 const hud=document.getElementById('hud'),msg=document.getElementById('msg');
 
 function segAt(z){return segs[Math.floor(((z%TRACK)+TRACK)%TRACK/SEG)%N]}
 const WORLD=true,MPU=12;                      // mundo aberto: 1 unidade do mapa = 12 m
 function worldStep(dt,pct){
   const W3=World3D;if(!W3.ready)return;
-  if(!wInit){wx=W3.start.x;wz=W3.start.z;hd=W3.start.hd;gy=W3.height(wx,wz)||0;wInit=true}
+  if(!wInit){wx=W3.start.x;wz=W3.start.z;hd=W3.start.hd;gy=W3.height(wx,wz,.3)||0;vgy=0;wInit=true}
+  if(!W3.tilesReady(wx,wz,8)){spd=0;return}                              // espera o mapa em volta carregar
   const v_ms=spd/MAXSPD*KMH/3.6,v=v_ms/MPU;                           // m/s e unidades/s
   const sa=clamp(steer*.5/(1+v_ms/16),-.5,.5);
   hd-=(v_ms/2.9*Math.tan(sa)*.62+slip*1.1*pct)*dt;                    // esterçar a direita diminui o rumo
   const da=hd+slip*.42*pct,nx=wx+Math.sin(da)*v*dt,nz=wz+Math.cos(da)*v*dt;
-  const ok=(x,z)=>{const h=W3.height(x,z);return h!==null&&h-gy<.14},fx=Math.sin(hd)*.18,fz=Math.cos(hd)*.18;
+  const ok=(x,z)=>{const h=W3.height(x,z,gy);return h!==null},fx=Math.sin(hd)*.18,fz=Math.cos(hd)*.18;
   if(ok(nx+fx,nz+fz)&&ok(nx,nz)){wx=nx;wz=nz}
   else if(ok(nx+fx,wz+fz)&&ok(nx,wz)){wx=nx;spd*=1-Math.min(1,dt*3)}
   else if(ok(wx+fx,nz+fz)&&ok(wx,nz)){wz=nz;spd*=1-Math.min(1,dt*3)}
   else{if(spd>MAXSPD*.12){physKick(-12);crashT=.4}spd*=.3}
-  const h=W3.height(wx,wz);if(h!==null)gy+=(h-gy)*Math.min(1,dt*14);
+  const h=W3.height(wx,wz,gy);
+  if(h!==null){if(h>=gy){gy+=(h-gy)*Math.min(1,dt*14);vgy=0}else{vgy+=2.6*dt;gy=Math.max(h,gy-vgy*dt);if(gy===h)vgy=0}}   // sobe suave em rampas; cai com gravidade de pontes
 }
 function update(dt){
   const sg=segAt(pos),pct=spd/MAXSPD;
@@ -416,7 +418,7 @@ const BODY={h:0,hv:0,p:0,pv:0,r:0,rv:0};
 //                  a: +1 frente   b: +1 direita
 const WH=[{n:'fl',a:1,b:-1},{n:'fr',a:1,b:1},{n:'rl',a:-1,b:-1},{n:'rr',a:-1,b:1}].map(w=>({...w,z:0,zp:0,spin:0,imp:0,impT:9}));
 const WR=.30;                                     // raio da roda em metros (para o giro)
-let view='ext',wx=0,wz=0,hd=0,gy=0,wInit=false,crashT=0,hzY=135,spdPrev=0,rough=0,slip=0,holdT=0,holdDir=0,lvl=0,vxl=0,sigDir=0,sigT=0,lightsOn=true,hazard=false,popFlash=0;
+let vgy=0,view='ext',wx=0,wz=0,hd=0,gy=0,wInit=false,crashT=0,hzY=135,spdPrev=0,rough=0,slip=0,holdT=0,holdDir=0,lvl=0,vxl=0,sigDir=0,sigT=0,lightsOn=true,hazard=false,popFlash=0;
 const yAt=z=>{const s0=segAt(z),s1=segAt(z+SEG),f=((z%SEG)+SEG)%SEG/SEG;return s0.y+(s1.y-s0.y)*f};
 function curbStep(px,side){const e=side*px-.95;return e<=0?0:Math.min(1,e/.12)*2.4}  // meio-fio ~2,4 px
 function physics(dt,sg,pct){
@@ -542,9 +544,10 @@ function drawRow(y,xc,hw,s,n,tt){
 function drawWorld(){
   const W3=World3D,cabv=view==='cab';
   ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,0,W,H);
-  if(!W3.ready||!wInit){ctx.fillStyle='#8c93b8';ctx.font='10px monospace';ctx.fillText('carregando o mapa...',W/2-50,H/2);return}
-  const fx=Math.sin(hd),fz=Math.cos(hd),eh=cabv?.095:.22,back=cabv?0:.5;
-  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*3,gy+eh-.003,wz+fz*3]:[wx+fx*1.5,gy+.12,wz+fz*1.5],fov:cabv?.95:.88,far:6.5};
+  if(W3.ready)W3.stream(wx,wz);
+  if(!W3.ready||!wInit||!W3.tilesReady(wx,wz,8)){const pr=W3.ready?W3.progress():0;ctx.fillStyle='#8c93b8';ctx.font='10px monospace';ctx.fillText('carregando o mapa... '+Math.round(pr*100)+'%',W/2-70,H/2);ctx.fillStyle='#2a3050';ctx.fillRect(W/2-70,H/2+8,140,4);ctx.fillStyle='#8c93b8';ctx.fillRect(W/2-70,H/2+8,140*pr,4);return}
+  const fx=Math.sin(hd),fz=Math.cos(hd),eh=cabv?.095:.22,back=cabv?0:.6,ah=W3.height(wx+fx*1.4,wz+fz*1.4,gy+.3),pit=ah===null?0:clamp(ah-gy,-.3,.3);pitS+=(pit-pitS)*.08;
+  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*3,gy+eh-.003+pitS*1.6,wz+fz*3]:[wx+fx*1.5,gy+.12+pitS*1.1,wz+fz*1.5],fov:cabv?.95:.88,far:12};
   W3.render(cam,{p:[wx,gy,wz],fwd:[fx,fz],head:lightsOn?1:0},[HAZE[0]/255,HAZE[1]/255,HAZE[2]/255],[.62,.7,1.05],t);
   hzY=W3.project(cam,[cam.eye[0]+fx*500,cam.eye[1],cam.eye[2]+fz*500])[1];
   ctx.save();ctx.translate(0,hzY-HOR);ctx.drawImage(SKY,0,0);
@@ -618,7 +621,7 @@ function render(){
   if(cab){}else if(rigReady&&RIG[ks]){
     const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-30+Math.round((Math.random()-.5)*sp*2);
     const dx0=Math.round(cxp-CVW/2),dy0=cyb-(100-10);
-    ctx.save();ctx.translate(cxp,cyb);ctx.scale(CARS,CARS);ctx.translate(-cxp,-cyb);
+    ctx.save();ctx.translate(cxp,cyb);ctx.scale(WORLD?CARW:CARS,WORLD?CARW:CARS);ctx.translate(-cxp,-cyb);
     if(!WORLD)beams(cxp,cyb);
     ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-g.w/2+6,cyb-3,g.w-12,5);
     ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb+2);ctx.scale(1,-1);ctx.drawImage(CARCV,dx0,dy0);ctx.restore();

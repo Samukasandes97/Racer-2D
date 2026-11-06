@@ -58,3 +58,9 @@
 - Renderização em WebGL puro (`world3d.js`, sem bibliotecas), blocos carregados por proximidade, neblina/noite/farol no shader.
 - Física no mapa: rumo + posição, colisão por altura do chão (prédio/vazio = parede), escorregar em parede, batida.
 - Futuro: trocar texturas dos prédios por fotos de Tóquio (mesmas áreas de UV do atlas).
+
+## Mundo aberto — ajustes (06/11/2026)
+- Carro em escala do mapa no mundo aberto (CARW=.62; o 1.5x continua só na pista Shibuya).
+- Colisão em 4 camadas de altura (rampas, pontes, escadas): o carro sobe/desce pela camada mais alta que alcança (degrau 0,14); cai com gravidade; câmera acompanha a inclinação.
+- Mapa inteiro fica na memória (nada descarrega); carrega do mais perto pro mais longe, com barra de progresso; draw distance 6,5 -> 12 unidades (~144 m) com corte por bloco. Posições em uint16 + uniforms (menos memória).
+- Buracos: telhados gerados em todos os prédios (altura da parede mais próxima) + chão escuro sob o mapa todo. Atlas ganhou um slot de cor para isso.
