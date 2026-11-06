@@ -305,6 +305,7 @@ const vkmh=()=>spd/MAXSPD*KMH;
 function engine(dt){
   const v=vkmh();
   thr+=((key.a&&!key.b?1:0)-thr)*Math.min(1,dt*8);
+  if(pend.d){pend.age+=dt;if(shiftT<=0&&((view==='cab'&&ckReady)?hw>.82&&pend.age>.12:pend.age>.2)||pend.age>.8&&shiftT<=0)commitShift()}
   if(shiftT>0)shiftT-=dt;
   else if(!manual){
     const r=v/GEARMAX[gear]*RPMHI;
@@ -320,14 +321,19 @@ function engine(dt){
   thrPrev=thr;
   if(A&&A.ready)audioUpdate();
 }
+const pend={d:0,age:0};   // troca pedida: so vale quando a mao chega na alavanca (cockpit) ou apos ~0,2 s (camera de fora)
 function shiftTo(d){
   if(!manual){manual=true;const b=document.getElementById('tg');b.classList.add('on');b.setAttribute('aria-pressed',true)}
-  const ng=clamp(gear+d,0,4);if(shiftT>0||ng===gear)return;
-  gear=ng;shiftT=.3;shiftArm.t=1;ev.push(d>0?'f_shift':'f_blip');physKick(d>0?-5:3);
+  const tgt=clamp(gear+pend.d+d,0,4);if(tgt===gear+pend.d)return;
+  if(!pend.d)pend.age=0;pend.d=tgt-gear;shiftArm.t=1;
+}
+function commitShift(){
+  const d=Math.sign(pend.d);pend.d-=d;pend.age=0;gear+=d;shiftT=.3;shiftArm.t=1;ev.push(d>0?'f_shift':'f_blip');physKick(d>0?-5:3);
   if(d>0&&antilag&&thr>.5&&rpm>5500){alT=.7;alR=rpm}
 }
 function gearK(){
-  if(!manual)return 1;if(shiftT>0)return 0;
+  if(!manual)return 1;if(shiftT>0||pend.d)return 0;   // embreagem pisada: sem tração até a marcha entrar
+  
   const over=vkmh()/GEARMAX[gear];if(over>=1)return 0;
   return [2.1,1.5,1.2,1,.9][gear]*clamp(.35+rpm/4200,.35,1.15)*(over>.9?(1-over)*10:1);
 }
@@ -766,7 +772,7 @@ function step(dt){
 let last=performance.now();
 function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;step(dt);render();requestAnimationFrame(tick)}
 requestAnimationFrame(tick);
-window.__test={set view(v){view=v},get wheelA(){return wheelA},nitro,wiper,DROPS,BODY,WH,get slip(){return slip},get lvl(){return lvl},step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
+window.__test={get hw(){return hw},pend,set view(v){view=v},get wheelA(){return wheelA},nitro,wiper,DROPS,BODY,WH,get slip(){return slip},get lvl(){return lvl},step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
 // ---------- controles ----------
 const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};

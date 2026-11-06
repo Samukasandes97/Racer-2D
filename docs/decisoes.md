@@ -49,3 +49,5 @@
 - Mão direita: sai do volante em arco, vai até a alavanca, segura enquanto troca, volta ao volante; antebraço estica junto.
 - Aro do volante sob as luvas reconstruído copiando o próprio aro (sem borrão) para a mão poder sair.
 - Grade do câmbio em H: 1ª/3ª/5ª puxam a alavanca para frente (cima na tela), 2ª/4ª para trás (baixo); troca de coluna passa pelo ponto morto (centro). A mão acompanha a bola. A luva existente já é um punho fechado (dedos curvados), reaproveitada para segurar a alavanca.
+- Câmbio manual: a troca só entra quando a mão chega na alavanca (cockpit) ou ~0,2 s depois (câmera de fora); embreagem pisada (sem tração) enquanto a mão vai; pedidos seguidos são enfileirados.
+- Próximo: mapa aberto (mundo aberto) que ele vai enviar; formatos a combinar (ver conversa).
