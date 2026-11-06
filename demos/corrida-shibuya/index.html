@@ -54,6 +54,8 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
     <button id="ba" aria-label="Acelerar">Acelerar</button>
     <button id="bb" aria-label="Frear">Frear</button>
     <button id="bd" class="wide" aria-label="Drift (freio de mão)">Drift · freio de mão</button>
+    <button id="gd" aria-label="Reduzir marcha">Marcha − (Z)</button>
+    <button id="gu" aria-label="Subir marcha">Marcha + (E)</button>
     <button id="bn" class="wide nitro" aria-label="Nitro">⚡ NITRO</button>
   </div>
   <div class="row">
@@ -62,6 +64,8 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
     <button id="ts" class="on" aria-pressed="true">Som do motor</button>
     <button id="tl" class="on" aria-pressed="true">Faróis</button>
     <button id="th" aria-pressed="false">Pisca-alerta</button>
+    <button id="tg" aria-pressed="false">Câmbio manual</button>
+    <button id="ta" class="on" aria-pressed="true">Anti-lag</button>
     <button id="tv" aria-pressed="false">Câmera: cockpit</button>
     <button id="tw" aria-pressed="false">Limpador</button>
     <button id="td" aria-pressed="false">Desembaçar</button>
@@ -272,7 +276,7 @@ const MAXSPD=SEG*60*.6,BRK=-MAXSPD/2.5,DEC=-MAXSPD/8,OFFD=-MAXSPD/2,OFFL=MAXSPD/
 // aceleracao em degrade: forte no comeco, suave perto do maximo (0 a 180 km/h em ~30 s)
 const accel=p=>MAXSPD*(.075*(1-p)+.0094);
 let pos=0,px=0,spd=0,steer=0,skyX=0,t=0,rainOn=true,filt=true;
-const key={l:0,r:0,b:0,a:0,d:0,n:0};const nitro={on:false,tank:1,k:0};
+const CARS=1.5;const key={l:0,r:0,b:0,a:0,d:0,n:0};const nitro={on:false,tank:1,k:0};
 const hud=document.getElementById('hud'),msg=document.getElementById('msg');
 
 function segAt(z){return segs[Math.floor(((z%TRACK)+TRACK)%TRACK/SEG)%N]}
@@ -295,12 +299,13 @@ function update(dt){
   if(Math.abs(steer)>.55){sigDir=Math.sign(steer);sigT=2.2}else sigT=Math.max(0,sigT-dt);
   skyX+=dt*pct*sg.curve*90;
   const off=Math.abs(px)>1.05;
-  if(key.b)spd+=BRK*dt;else if(key.a)spd+=accel(spd/MAXSPD)*dt;else spd+=DEC*dt;
+  if(key.b)spd+=BRK*dt;else if(key.a)spd+=accel(spd/MAXSPD)*gearK()*dt;else spd+=DEC*dt;
   if(off&&spd>OFFL)spd+=OFFD*dt;
   if(key.n&&nitro.tank>0&&spd>MAXSPD*.05){nitro.on=true;spd+=MAXSPD*.10*dt}else nitro.on=false;
   nitro.tank=clamp(nitro.tank+(nitro.on?-.22:.07)*dt,0,1);nitro.k+=((nitro.on?1:0)-nitro.k)*Math.min(1,dt*(nitro.on?3:.7));
   px=clamp(px,-2.2,2.2);spd=clamp(spd,0,MAXSPD*(1+.22*nitro.k));
-  physics(dt,sg,pct);engine(dt);hud.innerHTML=Math.round(spd/MAXSPD*KMH)+'<small>km/h</small><br>'+Math.round(rpm/10)*10+'<small>rpm · '+(gear+1)+'ª</small>';
+  if(manual&&!nitro.on){const cap=GEARMAX[gear]/KMH*MAXSPD*1.02;if(spd>cap)spd=Math.max(cap,spd-MAXSPD*.35*dt)}   // freio-motor da marcha
+  physics(dt,sg,pct);engine(dt);hud.innerHTML=Math.round(spd/MAXSPD*KMH)+'<small>km/h</small><br>'+Math.round(rpm/10)*10+'<small>rpm · '+(gear+1)+'ª'+(manual?' M':'')+'</small>';
 }
 
 
@@ -312,24 +317,36 @@ const GEARMAX=[48,78,108,142,180];                // km/h na rotacao maxima de c
 const RPMHI=7700,RPM0=2880;                       // corte de giro; rotacao da fatia mais grave
 const FSL=[28.0,31.6,35.4,39.9,44.9,50.5,56.9,64.0]; // tom (Hz) medido em cada fatia
 const HZ_PER_RPM=FSL[0]/RPM0;
-let gear=0,rpm=900,shiftT=0,thr=0,thrPrev=0,soundOn=true,AC=null,A=null;const ev=[];
+let manual=false,antilag=true,alT=0,alR=0,alN=0,gear=0,rpm=900,shiftT=0,thr=0,thrPrev=0,soundOn=true,AC=null,A=null;const ev=[];
 const vkmh=()=>spd/MAXSPD*KMH;
 function engine(dt){
   const v=vkmh();
   thr+=((key.a&&!key.b?1:0)-thr)*Math.min(1,dt*8);
   if(shiftT>0)shiftT-=dt;
-  else{
+  else if(!manual){
     const r=v/GEARMAX[gear]*RPMHI;
-    if(r>7300&&gear<4){gear++;shiftT=.45;ev.push('f_shift');physKick(-6)}
-    else if(gear>0&&r<3000){gear--;shiftT=.3;ev.push('f_blip');physKick(4)}
+    if(r>7300&&gear<4){gear++;shiftT=.45;ev.push('f_shift');physKick(-6);shiftArm.t=.4;if(antilag&&thr>.5){alT=.7;alR=rpm}}
+    else if(gear>0&&r<3000){gear--;shiftT=.3;ev.push('f_blip');physKick(4);shiftArm.t=.4}
   }
   const base=Math.max(900,v/GEARMAX[gear]*RPMHI);
-  const target=(v<8&&key.a)?3400:base;
+  let target=(v<8&&key.a)?3400:base;
+  if(alT>0){alT-=dt;if(thr>.6)alT=0;else{target=Math.max(target,alR*(.5+.5*alT/1.3));alN-=dt;if(alN<=0){ev.push(Math.random()<.55?'f_pop':'f_blip');popFlash=.12;physKick(.7);alN=.07+Math.random()*.16}}}
   rpm+=(target-rpm)*Math.min(1,dt*(shiftT>0?7:(thr>.5?12:5)));
   rpm=clamp(rpm,850,RPMHI+60);
-  if(thrPrev>.7&&thr<.5&&rpm>5000)ev.push(rpm>6000?'f_pop':'cut');   // tirou o pe: pipocos em alta, queda de giro do Civic em media
+  if(thrPrev>.7&&thr<.5&&rpm>4500){if(antilag){alT=1.3;alR=rpm;alN=0}else if(rpm>5000)ev.push(rpm>6000?'f_pop':'cut')}   // tirou o pe: pipocos em alta, queda de giro do Civic em media
   thrPrev=thr;
   if(A&&A.ready)audioUpdate();
+}
+function shiftTo(d){
+  if(!manual){manual=true;const b=document.getElementById('tg');b.classList.add('on');b.setAttribute('aria-pressed',true)}
+  const ng=clamp(gear+d,0,4);if(shiftT>0||ng===gear)return;
+  gear=ng;shiftT=.3;shiftArm.t=.45;ev.push(d>0?'f_shift':'f_blip');physKick(d>0?-5:3);
+  if(d>0&&antilag&&thr>.5&&rpm>5500){alT=.7;alR=rpm}
+}
+function gearK(){
+  if(!manual)return 1;if(shiftT>0)return 0;
+  const over=vkmh()/GEARMAX[gear];if(over>=1)return 0;
+  return [2.1,1.5,1.2,1,.9][gear]*clamp(.35+rpm/4200,.35,1.15)*(over>.9?(1-over)*10:1);
 }
 function initAudio(){
   if(AC){if(AC.state==='suspended')AC.resume();return}
@@ -573,14 +590,16 @@ function render(){
   let nl=Math.abs(slip)>(lvl===3?.45:.6)?3:(m>(lvl>=2?.2:.3)?2:0);lvl=nl;
   const ks=lvl===3?(sd>0?'l3':'r3'):lvl===2?(sd>0?'l2':'r2'):'c';
   if(cab){}else if(rigReady&&RIG[ks]){
-    const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-34;
+    const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-30;
     const dx0=Math.round(cxp-CVW/2),dy0=cyb-(100-10);
+    ctx.save();ctx.translate(cxp,cyb);ctx.scale(CARS,CARS);ctx.translate(-cxp,-cyb);
     beams(cxp,cyb);
     ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-g.w/2+6,cyb-3,g.w-12,5);
     ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb+2);ctx.scale(1,-1);ctx.drawImage(CARCV,dx0,dy0);ctx.restore();
     ctx.drawImage(CARCV,dx0,dy0);
     lights(ks,dx0,dy0,g);
     spray(dx0,dy0,ks);window.__carpos={dx0,dy0};
+    ctx.restore();
   }else if(loaded>=5&&CAR[ks].complete){
     const im=CAR[ks],cxp=W/2+Math.round(steer*4),cyb=H-34;
     ctx.drawImage(im,Math.round(cxp-im.width/2),cyb-im.height);
@@ -612,21 +631,24 @@ function post(){
 const CK={};let CKC=null,ckReady=false;
 fetch('img/cockpit/cockpit.json').then(r=>r.json()).then(c=>{CKC=c;return Promise.all(['bg','wheel','gloveL','gloveR','armL','armR'].map(n=>new Promise(res=>{const i=new Image();i.onload=()=>{CK[n]=i;res()};i.onerror=res;i.src='img/cockpit/'+n+'.png'})))}).then(()=>{ckReady=!!CK.bg}).catch(()=>{});
 GLW.grn=mkG('70,255,130');
-let wheelA=0,wheelV=0,hb=0,cabX=0,cabY=0,cabWX=0,cabWY=0,cabRoll=0,armJx=0,armJy=0;
-const wiper={on:false,ph:0},defog={on:false},fog={v:0},DROPS=[],radio={on:true,f:102.3};
+let wheelA=0,wheelV=0,hb=0,gs=0,cabX=0,cabY=0,cabWX=0,cabWY=0,cabRoll=0,armJx=0,armJy=0;
+const shiftArm={t:0},wiper={on:false,ph:0},defog={on:false},fog={v:0},DROPS=[],radio={on:true,f:102.3};
 const WIPERS=[[175,150,112],[300,150,104]];
 function cabUpdate(dt){
   const sg=segAt(pos),pct=spd/MAXSPD;
   const ay=clamp(steer*pct*.9+slip*pct*.9+sg.curve*pct*pct*.25,-1.4,1.4);
   // volante: mola + amortecedor, 190 graus no total (+-95), contra-esterça no drift e treme com buracos/lombadas
-  const tgt=clamp(steer*95-slip*38+(Math.random()-.5)*3*pct+clamp(BODY.hv,-4,4)*.5,-95,95);
-  wheelV+=(900*(tgt-wheelA)-45*wheelV)*dt;wheelA=clamp(wheelA+wheelV*dt,-95,95);
+  const act=clamp(pct*4,0,1);                          // parado: sem tremor nenhum
+  const tgt=clamp(steer*95-slip*38+act*((Math.random()-.5)*3*pct+clamp(BODY.hv,-4,4)*.5),-95,95);
+  for(let i=0;i<4;i++){const h=dt/4;wheelV+=(900*(tgt-wheelA)-45*wheelV)*h;wheelA=clamp(wheelA+wheelV*h,-95,95)}
+  if(Math.abs(tgt)<.2&&Math.abs(wheelA)<.2&&Math.abs(wheelV)<2){wheelA=0;wheelV=0}
+  gs+=((shiftArm.t>0?1:0)-gs)*Math.min(1,dt*14);shiftArm.t-=dt;
   hb+=((key.d&&pct>.1?1:0)-hb)*Math.min(1,dt*9);
   // balanço da cabine: inercia lateral (curva), arfagem (acelerar/frear) e buracos
-  const tx=ay*2.4+BODY.r*.7,ty=-BODY.h*.8-BODY.p*.5;
+  const tx=ay*2.4+act*BODY.r*.7,ty=act*(-BODY.h*.8-BODY.p*.5);
   cabX+=(tx-cabX)*Math.min(1,dt*9);cabY+=(ty-cabY)*Math.min(1,dt*9);
   cabWX=cabX*.5-slip*26;cabWY=cabY*.9;cabRoll=BODY.r*.003-ay*.012;
-  armJx+=((-BODY.hv*.1)-armJx)*Math.min(1,dt*14);armJy+=((BODY.hv*.16)-armJy)*Math.min(1,dt*14);
+  armJx+=((-act*BODY.hv*.1)-armJx)*Math.min(1,dt*14);armJy+=((act*BODY.hv*.16)-armJy)*Math.min(1,dt*14);
   // nitro: chama no escape e estouros
   if(nitro.on){popFlash=.1;if(Math.random()<dt*5){ev.push('f_pop');physKick(1.2)}}
   const bn=document.getElementById('bn');if(bn)bn.style.setProperty('--t',nitro.tank.toFixed(2));
@@ -640,11 +662,16 @@ function cabUpdate(dt){
   }
 }
 const wiperAng=()=>{const f=wiper.ph<1?wiper.ph:2-wiper.ph;return 176-158*(.5-.5*Math.cos(Math.PI*f))};
-function nitroFx(){
-  if(nitro.k<.03)return;const k=nitro.k;
-  ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(120,170,255,'+(.35*k)+')';ctx.lineWidth=1;
-  for(let i=0;i<22;i++){const a=hash(i*7.3+Math.floor(t*18))*6.283,r0=60+hash(i)*60,r1=r0+40+hash(i+9)*90;
-    ctx.beginPath();ctx.moveTo(W/2+Math.cos(a)*r0,100+Math.sin(a)*r0*.6);ctx.lineTo(W/2+Math.cos(a)*r1,100+Math.sin(a)*r1*.6);ctx.stroke()}
+function nitroFx(){   // linhas de velocidade (crescem com a velocidade; azuis no nitro) + vinheta
+  const pc=clamp(spd/MAXSPD,0,1.25),k=Math.max(nitro.k,clamp((pc-.3)/.7,0,1)*.8);
+  if(k<.03)return;
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineWidth=1;
+  const n=Math.round(10+30*k),blue=nitro.k>.1;
+  for(let i=0;i<n;i++){
+    const ph=(t*(.8+1.7*pc)+hash(i*3.1))%1,a=hash(i*7.3)*6.283,ca=Math.cos(a),sa=Math.sin(a),r0=75+ph*ph*220,len=8+ph*ph*(40+60*k);
+    ctx.strokeStyle=(blue?'rgba(130,175,255,':'rgba(215,228,255,')+((.12+.7*ph)*k)+')';
+    ctx.beginPath();ctx.moveTo(W/2+ca*r0,105+sa*r0*.62);ctx.lineTo(W/2+ca*(r0+len),105+sa*(r0+len)*.62);ctx.stroke();
+  }
   ctx.restore();
 }
 const F35={'0':'111101101101111','1':'010110010010111','2':'111001111100111','3':'111001111001111','4':'101101111001001','5':'111100111001111','6':'111100111101111','7':'111001001001001','8':'111101111101111','9':'111101111001111'};
@@ -687,9 +714,9 @@ function drawCab(){
   // volante (rigido com o eixo), antebraços esticados ate as luvas, luvas
   const th=wheelA*Math.PI/180,H0=C.hub,rot=(p,a)=>[H0[0]+(p[0]-H0[0])*Math.cos(a)-(p[1]-H0[1])*Math.sin(a),H0[1]+(p[0]-H0[0])*Math.sin(a)+(p[1]-H0[1])*Math.cos(a)];
   ctx.save();ctx.translate(H0[0],H0[1]);ctx.rotate(th);ctx.drawImage(CK.wheel,C.wheelBox[0]-H0[0],C.wheelBox[1]-H0[1]);ctx.restore();
-  const hbo=[hb*22,hb*28];                              // mao direita solta o volante e puxa o freio de mao
+  const hbo=[Math.max(hb*22,gs*14),Math.max(hb*28,gs*20)];                              // mao direita solta o volante e puxa o freio de mao
   for(const [side,key2,gl] of [[-1,'armL','gloveL'],[1,'armR','gloveR']]){
-    const a=C[key2],img=CK[key2],isR=side>0,off=isR?hbo:[0,0],ang=isR?th*(1-hb*.7):th;
+    const a=C[key2],img=CK[key2],isR=side>0,off=isR?hbo:[0,0],ang=isR?th*(1-Math.max(hb,gs)*.7):th;
     const w0=a.wrist,wn0=rot(w0,ang);const Wn=[wn0[0]+off[0]+armJx*1.5,wn0[1]+off[1]+armJy*1.5];
     const A=[w0[0]+side*6,w0[1]+(img.height-(w0[1]-a.box[1]))];
     armDraw(img,a.box,w0,Wn,A);
@@ -731,7 +758,7 @@ const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};
   const off=()=>{key[k]=0;b.classList.remove('on')};
   b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off))};
-hold('bn','n');hold('bl','l');hold('br','r');hold('bb','b');hold('ba','a');hold('bd','d');
+document.getElementById('gu').onclick=()=>shiftTo(1);document.getElementById('gd').onclick=()=>shiftTo(-1);hold('bn','n');hold('bl','l');hold('br','r');hold('bb','b');hold('ba','a');hold('bd','d');
 const km={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowDown:'b',s:'b',S:'b',ArrowUp:'a',w:'a',W:'a',' ':'d'};
 addEventListener('keydown',e=>{if(km[e.key]){key[km[e.key]]=1;msg.style.opacity=0;e.preventDefault()}});
 addEventListener('keyup',e=>{if(km[e.key])key[km[e.key]]=0});
@@ -742,6 +769,6 @@ let tk=null;
 st.addEventListener('pointerdown',e=>{tk=side(e);key[tk]=1;msg.style.opacity=0});
 ['pointerup','pointercancel','pointerleave'].forEach(ev=>st.addEventListener(ev,()=>{if(tk){key[tk]=0;tk=null}}));
 const tg=(id,fn)=>{const b=document.getElementById(id);b.onclick=()=>{const v=fn();b.classList.toggle('on',v);b.setAttribute('aria-pressed',v)}};
-tg('tf',()=>filt=!filt);tg('tv',()=>{view=view==='cab'?'ext':'cab';return view==='cab'});tg('tw',()=>wiper.on=!wiper.on);tg('td',()=>defog.on=!defog.on);tg('tl',()=>lightsOn=!lightsOn);tg('th',()=>hazard=!hazard);
-addEventListener('keydown',e=>{if(e.key==='l'||e.key==='L')document.getElementById('tl').click();if(e.key==='h'||e.key==='H')document.getElementById('th').click();if(e.key==='c'||e.key==='C')document.getElementById('tv').click();if(e.key==='q'||e.key==='Q')document.getElementById('tw').click();if(e.key==='Shift'||e.key==='n'||e.key==='N')key.n=1});addEventListener('keyup',e=>{if(e.key==='Shift'||e.key==='n'||e.key==='N')key.n=0});tg('ts',()=>{soundOn=!soundOn;return soundOn});tg('tr',()=>rainOn=!rainOn);
+tg('tf',()=>filt=!filt);tg('tg',()=>manual=!manual);tg('ta',()=>antilag=!antilag);tg('tv',()=>{view=view==='cab'?'ext':'cab';return view==='cab'});tg('tw',()=>wiper.on=!wiper.on);tg('td',()=>defog.on=!defog.on);tg('tl',()=>lightsOn=!lightsOn);tg('th',()=>hazard=!hazard);
+addEventListener('keydown',e=>{if(e.key==='l'||e.key==='L')document.getElementById('tl').click();if(e.key==='h'||e.key==='H')document.getElementById('th').click();if(!e.repeat&&(e.key==='e'||e.key==='E'))shiftTo(1);if(!e.repeat&&(e.key==='z'||e.key==='Z'))shiftTo(-1);if(e.key==='c'||e.key==='C')document.getElementById('tv').click();if(e.key==='q'||e.key==='Q')document.getElementById('tw').click();if(e.key==='Shift'||e.key==='n'||e.key==='N')key.n=1});addEventListener('keyup',e=>{if(e.key==='Shift'||e.key==='n'||e.key==='N')key.n=0});tg('ts',()=>{soundOn=!soundOn;return soundOn});tg('tr',()=>rainOn=!rainOn);
 </script>

@@ -31,3 +31,10 @@
 - Painel: ponteiro de velocidade (mostrador só vai até 140) e de rotação (x100), setas verdes, luz vermelha do freio de mão, rádio FM (sem áudio até ele enviar músicas), HEAT/FAN/HEAT = desembaçar/limpador/farol.
 - Nitro: botão ou tecla N/Shift; tanque gasta e recarrega; passa de 180 km/h só enquanto ativo.
 - Retrovisores: reflexo espelhado da cena (não é a visão real de trás).
+
+## Ajustes pós-cockpit (06/11)
+- Volante/braços não tremem mais parado (integração estável + tremor só em movimento).
+- Câmbio: automático ou manual (botões Marcha −/+ ou teclas Z/E); em manual cada marcha tem seu limite de velocidade, aceleração própria e freio-motor; mão direita vai ao câmbio.
+- Anti-lag (liga/desliga): ao soltar o acelerador em rotação alta, a rotação cai devagar com pipocos e labareda; também nas trocas.
+- Câmera de fora mais perto: carro 1,5x maior.
+- Linhas de velocidade em ambas as câmeras, crescem com a velocidade.
