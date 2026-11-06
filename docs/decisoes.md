@@ -51,3 +51,10 @@
 - Grade do câmbio em H: 1ª/3ª/5ª puxam a alavanca para frente (cima na tela), 2ª/4ª para trás (baixo); troca de coluna passa pelo ponto morto (centro). A mão acompanha a bola. A luva existente já é um punho fechado (dedos curvados), reaproveitada para segurar a alavanca.
 - Câmbio manual: a troca só entra quando a mão chega na alavanca (cockpit) ou ~0,2 s depois (câmera de fora); embreagem pisada (sem tração) enquanto a mão vai; pedidos seguidos são enfileirados.
 - Próximo: mapa aberto (mundo aberto) que ele vai enviar; formatos a combinar (ver conversa).
+
+## Mundo aberto — mapa Chicago (Driver 2) (06/11)
+- Demo nova: `demos/mundo-aberto` (a do Shibuya continua intacta). Mesmo jogo, mesmas câmeras (atrás e cockpit), mesmo carro 2D e filtro pixel-art; só a pista mudou para o mapa 3D.
+- Conversão: `ferramentas/mapa/converter_mapa.py` (OBJ 108 MB → 120 blocos, atlas 2048, grade de colisão). Mapa só para protótipo interno; crédito: pancakesbassoondonut (CC BY).
+- Renderização em WebGL puro (`world3d.js`, sem bibliotecas), blocos carregados por proximidade, neblina/noite/farol no shader.
+- Física no mapa: rumo + posição, colisão por altura do chão (prédio/vazio = parede), escorregar em parede, batida.
+- Futuro: trocar texturas dos prédios por fotos de Tóquio (mesmas áreas de UV do atlas).
