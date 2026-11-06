@@ -48,3 +48,4 @@
 - Alavanca maior, com boot, haste e bola com o número da marcha; move no padrão em H.
 - Mão direita: sai do volante em arco, vai até a alavanca, segura enquanto troca, volta ao volante; antebraço estica junto.
 - Aro do volante sob as luvas reconstruído copiando o próprio aro (sem borrão) para a mão poder sair.
+- Grade do câmbio em H: 1ª/3ª/5ª puxam a alavanca para frente (cima na tela), 2ª/4ª para trás (baixo); troca de coluna passa pelo ponto morto (centro). A mão acompanha a bola. A luva existente já é um punho fechado (dedos curvados), reaproveitada para segurar a alavanca.

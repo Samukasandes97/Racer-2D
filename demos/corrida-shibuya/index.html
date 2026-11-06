@@ -629,8 +629,11 @@ function cabUpdate(dt){
   for(let i=0;i<4;i++){const h=dt/4;wheelV+=(900*(tgt-wheelA)-45*wheelV)*h;wheelA=clamp(wheelA+wheelV*h,-95,95)}
   if(Math.abs(tgt)<.2&&Math.abs(wheelA)<.2&&Math.abs(wheelV)<2){wheelA=0;wheelV=0}
   // mao no cambio: vai ate a alavanca (suave), segura enquanto troca, volta ao volante
-  shiftArm.t-=dt;hw+=((shiftArm.t>0?1:0)-hw)*Math.min(1,dt*6.5);
-  if(hw>.75){const sl=GX[gear];shP[0]+=(sl[0]-shP[0])*Math.min(1,dt*12);shP[1]+=(sl[1]-shP[1])*Math.min(1,dt*12)}
+  shiftArm.t-=dt;hw+=((shiftArm.t>0?1:0)-hw)*Math.min(1,dt*9);
+  if(hw>.6){   // grade em H: troca de coluna passa pelo ponto morto (centro); 1ª/3ª/5ª = para frente (cima), 2ª/4ª = para trás (baixo)
+    const sl=GX[gear];let tx=sl[0],ty=sl[1];
+    if(Math.abs(shP[0]-sl[0])>1.2){if(Math.abs(shP[1])>1.2){tx=shP[0];ty=0}else{ty=0}}
+    shP[0]+=(tx-shP[0])*Math.min(1,dt*15);shP[1]+=(ty-shP[1])*Math.min(1,dt*15)}
   hb+=((key.d&&pct>.1?1:0)-hb)*Math.min(1,dt*9);
   // balanço da cabine: inercia lateral (curva), arfagem (acelerar/frear) e buracos
   const tx=ay*2.4+act*BODY.r*.7,ty=act*(-BODY.h*.8-BODY.p*.5);
@@ -721,11 +724,11 @@ function drawCab(){
    pxText(String(gear+1),kx-1,ky-2.5,'#ffb23a');pxText(String(gear+1),kx,ky-2.5,'#ffb23a')}
   for(const [side,key2,gl] of [[-1,'armL','gloveL'],[1,'armR','gloveR']]){
     const a=C[key2],img=CK[key2],isR=side>0,g=CK[gl],b=C[gl].box;
-    const grip=isR?Math.max(hb,hw):0,ang=th*(1-.88*grip);
+    const grip=isR?Math.max(hb,hw):0,ang=th*(1-.88*grip)+(isR?hw*(shP[0]*.012-shP[1]*.012):0);
     let off=[0,0];
     if(isR){
       const gc=[b[0]+g.width/2,b[1]+g.height/2],rc=rot(gc,ang);
-      const sx=(kx-3-rc[0])*hw,sy=(ky+9-rc[1])*hw-Math.sin(Math.PI*hw)*9;           // trajetoria ate a alavanca, com arco
+      const sx=(kx-3-rc[0])*hw,sy=(ky+32-rc[1])*hw-Math.sin(Math.PI*hw)*9;           // trajetoria ate a alavanca, com arco
       off=[sx*1+hb*(1-hw)*26,sy+hb*(1-hw)*34];
     }
     const jx=armJx*1.5,jy=armJy*1.5,w0=a.wrist,wn0=rot(w0,ang),Wn=[wn0[0]+off[0]+jx,wn0[1]+off[1]+jy];
