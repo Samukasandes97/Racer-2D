@@ -53,7 +53,7 @@ low=raster(up,-1)
 low[low>1e8]=-9
 gridH=np.clip(np.round(low*1000),-32767,32767).astype(np.int16)
 gridH[low<=-9]=-32768
-gridH.tofile(os.path.join(OUT,'grid.bin'))
+gridH.tofile(os.path.join(OUT,'grid.wav'))
 # ---- blocos
 cx=((P[:,:,0].mean(1)-x0)//T).astype(int);cz=((P[:,:,2].mean(1)-z0)//T).astype(int)
 tiles=[];tot=0
@@ -72,7 +72,7 @@ for tx in range(cx.max()+1):
         q=np.round((pos-mn)/ext*65535).astype(np.uint16)
         qu=np.round(np.clip(uu,0,1)*65535).astype(np.uint16)
         qs=np.round(sh*255).astype(np.uint8)
-        nv=len(q);name='t_%d_%d_%d.bin'%(tx,tz,part)
+        nv=len(q);name='t_%d_%d_%d.wav'%(tx,tz,part)
         with open(os.path.join(OUT,name),'wb') as f:
             f.write(struct.pack('<II',nv,len(ind)));f.write(q.tobytes());f.write(qu.tobytes());f.write(qs.tobytes());f.write(b'\0'*((4-nv%4)%4));f.write(ind.tobytes())
         tiles.append(dict(f=name,tx=tx,tz=tz,mn=mn.round(5).tolist(),ext=ext.round(5).tolist(),nv=nv,ni=len(ind)));tot+=os.path.getsize(os.path.join(OUT,name))

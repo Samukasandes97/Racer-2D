@@ -46,7 +46,7 @@ const img=new Image();img.onload=()=>{tex=gl.createTexture();gl.bindTexture(gl.T
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)};
 img.src=MAP+'atlas.png';
-Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.bin').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json())]).then(([cfg,g,st])=>{
+Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.wav').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json())]).then(([cfg,g,st])=>{
   W3.cfg=cfg;W3.grid=new Int16Array(g);W3.start=st;index=cfg.tiles;W3.ready=true}).catch(e=>{W3.error=String(e)});
 // altura do chão (unidades do mapa); null = vazio (prédio/fora do mapa)
 W3.height=function(x,z){const c=W3.cfg;if(!c)return 0;const ix=Math.floor((x-c.x0)/c.CELL),iz=Math.floor((z-c.z0)/c.CELL);
