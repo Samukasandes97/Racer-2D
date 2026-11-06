@@ -43,3 +43,8 @@
 - Layout sem rolagem (cabe na tela em pé e deitado), botões só com ícones, polegares embaixo (esquerda: virar e marcha; direita: freio, acelerar, freio de mão, nitro); ícones pequenos no topo (câmera 1ª pessoa, faróis, pisca, limpador, desembaçar, câmbio M, anti-lag, filtro, chuva, som).
 - Alavanca de câmbio desenhada no cockpit (padrão em H, mostra a marcha); a mão direita vai até ela.
 - Acima de 100 km/h: tremor de câmera, zoom (FOV), embaçado radial nas bordas e linhas de velocidade. Protótipo do CapCut dele fica para depois.
+
+## Câmbio: alavanca grande e mão fluida (06/11)
+- Alavanca maior, com boot, haste e bola com o número da marcha; move no padrão em H.
+- Mão direita: sai do volante em arco, vai até a alavanca, segura enquanto troca, volta ao volante; antebraço estica junto.
+- Aro do volante sob as luvas reconstruído copiando o próprio aro (sem borrão) para a mão poder sair.

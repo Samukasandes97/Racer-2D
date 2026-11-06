@@ -308,8 +308,8 @@ function engine(dt){
   if(shiftT>0)shiftT-=dt;
   else if(!manual){
     const r=v/GEARMAX[gear]*RPMHI;
-    if(r>7300&&gear<4){gear++;shiftT=.45;ev.push('f_shift');physKick(-6);shiftArm.t=.4;if(antilag&&thr>.5){alT=.7;alR=rpm}}
-    else if(gear>0&&r<3000){gear--;shiftT=.3;ev.push('f_blip');physKick(4);shiftArm.t=.4}
+    if(r>7300&&gear<4){gear++;shiftT=.45;ev.push('f_shift');physKick(-6);shiftArm.t=1;if(antilag&&thr>.5){alT=.7;alR=rpm}}
+    else if(gear>0&&r<3000){gear--;shiftT=.3;ev.push('f_blip');physKick(4);shiftArm.t=1}
   }
   const base=Math.max(900,v/GEARMAX[gear]*RPMHI);
   let target=(v<8&&key.a)?3400:base;
@@ -323,7 +323,7 @@ function engine(dt){
 function shiftTo(d){
   if(!manual){manual=true;const b=document.getElementById('tg');b.classList.add('on');b.setAttribute('aria-pressed',true)}
   const ng=clamp(gear+d,0,4);if(shiftT>0||ng===gear)return;
-  gear=ng;shiftT=.3;shiftArm.t=.45;ev.push(d>0?'f_shift':'f_blip');physKick(d>0?-5:3);
+  gear=ng;shiftT=.3;shiftArm.t=1;ev.push(d>0?'f_shift':'f_blip');physKick(d>0?-5:3);
   if(d>0&&antilag&&thr>.5&&rpm>5500){alT=.7;alR=rpm}
 }
 function gearK(){
@@ -616,7 +616,8 @@ function post(){
 const CK={};let CKC=null,ckReady=false;
 fetch('img/cockpit/cockpit.json').then(r=>r.json()).then(c=>{CKC=c;return Promise.all(['bg','wheel','gloveL','gloveR','armL','armR'].map(n=>new Promise(res=>{const i=new Image();i.onload=()=>{CK[n]=i;res()};i.onerror=res;i.src='img/cockpit/'+n+'.png'})))}).then(()=>{ckReady=!!CK.bg}).catch(()=>{});
 GLW.grn=mkG('70,255,130');
-let shP=[0,0],wheelA=0,wheelV=0,hb=0,gs=0,cabX=0,cabY=0,cabWX=0,cabWY=0,cabRoll=0,armJx=0,armJy=0;
+let shP=[0,0],hw=0,wheelA=0,wheelV=0,hb=0,cabX=0,cabY=0,cabWX=0,cabWY=0,cabRoll=0,armJx=0,armJy=0;
+const GX=[[-6,-7],[-6,7],[0,-7],[0,7],[6,-7]],LEV={bx:404,by:260,len:34};
 const shiftArm={t:0},wiper={on:false,ph:0},defog={on:false},fog={v:0},DROPS=[],radio={on:true,f:102.3};
 const WIPERS=[[175,150,112],[300,150,104]];
 function cabUpdate(dt){
@@ -627,7 +628,9 @@ function cabUpdate(dt){
   const tgt=clamp(steer*95-slip*38+act*((Math.random()-.5)*3*pct+clamp(BODY.hv,-4,4)*.5),-95,95);
   for(let i=0;i<4;i++){const h=dt/4;wheelV+=(900*(tgt-wheelA)-45*wheelV)*h;wheelA=clamp(wheelA+wheelV*h,-95,95)}
   if(Math.abs(tgt)<.2&&Math.abs(wheelA)<.2&&Math.abs(wheelV)<2){wheelA=0;wheelV=0}
-  gs+=((shiftArm.t>0?1:0)-gs)*Math.min(1,dt*14);shiftArm.t-=dt;
+  // mao no cambio: vai ate a alavanca (suave), segura enquanto troca, volta ao volante
+  shiftArm.t-=dt;hw+=((shiftArm.t>0?1:0)-hw)*Math.min(1,dt*6.5);
+  if(hw>.75){const sl=GX[gear];shP[0]+=(sl[0]-shP[0])*Math.min(1,dt*12);shP[1]+=(sl[1]-shP[1])*Math.min(1,dt*12)}
   hb+=((key.d&&pct>.1?1:0)-hb)*Math.min(1,dt*9);
   // balanço da cabine: inercia lateral (curva), arfagem (acelerar/frear) e buracos
   const tx=ay*2.4+act*BODY.r*.7,ty=act*(-BODY.h*.8-BODY.p*.5);
@@ -707,21 +710,29 @@ function drawCab(){
   // volante (rigido com o eixo), antebraços esticados ate as luvas, luvas
   const th=wheelA*Math.PI/180,H0=C.hub,rot=(p,a)=>[H0[0]+(p[0]-H0[0])*Math.cos(a)-(p[1]-H0[1])*Math.sin(a),H0[1]+(p[0]-H0[0])*Math.sin(a)+(p[1]-H0[1])*Math.cos(a)];
   ctx.save();ctx.translate(H0[0],H0[1]);ctx.rotate(th);ctx.drawImage(CK.wheel,C.wheelBox[0]-H0[0],C.wheelBox[1]-H0[1]);ctx.restore();
-  const hbo=[Math.max(hb*22,gs*30),Math.max(hb*28,gs*26)];
-  const GX=[[-3,-3],[-3,3],[0,-3],[0,3],[3,-3]],tp=GX[gear];shP[0]+=(tp[0]-shP[0])*.3;shP[1]+=(tp[1]-shP[1])*.3;
-  {const bx=368,by=262,kx=bx+shP[0],ky=by-14+shP[1];
-   ctx.fillStyle='#0b0b0e';ctx.beginPath();ctx.ellipse(bx,by,7,3,0,0,6.3);ctx.fill();
-   ctx.strokeStyle='#000';ctx.lineWidth=3.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,by-1);ctx.lineTo(kx,ky);ctx.stroke();
-   ctx.strokeStyle='#3b3f4a';ctx.lineWidth=1.6;ctx.stroke();
-   ctx.fillStyle='#000';ctx.beginPath();ctx.arc(kx,ky,4.4,0,6.3);ctx.fill();ctx.fillStyle='#4a5266';ctx.beginPath();ctx.arc(kx,ky,3.5,0,6.3);ctx.fill();
-   ctx.fillStyle='#b4bdd2';ctx.fillRect(kx-2,ky-2.5,2,1);pxText(String(gear+1),kx-1,ky-2,'#ffb23a')}                              // mao direita solta o volante e puxa o freio de mao
+  const kx=LEV.bx+shP[0],ky=LEV.by-LEV.len+shP[1];
+  {const bx=LEV.bx,by=LEV.by;                                   // alavanca de cambio (arte propria, mesmo estilo: contorno preto + sombreado)
+   ctx.fillStyle='#050507';ctx.beginPath();ctx.ellipse(bx,by,17,6,0,0,6.3);ctx.fill();ctx.fillStyle='#3a3f4c';ctx.beginPath();ctx.ellipse(bx,by-1.2,14,4.4,0,0,6.3);ctx.fill();
+   ctx.fillStyle='#0b0c10';ctx.beginPath();ctx.ellipse(bx,by-2,8,2.6,0,0,6.3);ctx.fill();   // abertura da grade em H
+   ctx.lineCap='round';ctx.strokeStyle='#000';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(bx,by-1);ctx.lineTo(kx,ky);ctx.stroke();
+   ctx.strokeStyle='#8a93a8';ctx.lineWidth=4.6;ctx.stroke();ctx.strokeStyle='#9aa3b8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(bx-.8,by-2);ctx.lineTo(kx-.8,ky);ctx.stroke();
+   ctx.fillStyle='#000';ctx.beginPath();ctx.arc(kx,ky,10,0,6.3);ctx.fill();ctx.fillStyle='#3a4050';ctx.beginPath();ctx.arc(kx,ky,8.6,0,6.3);ctx.fill();
+   ctx.fillStyle='#596175';ctx.beginPath();ctx.arc(kx-1.2,ky-1.5,6.2,0,6.3);ctx.fill();ctx.fillStyle='#c4ccdf';ctx.fillRect(kx-5.5,ky-5.5,4,2);
+   pxText(String(gear+1),kx-1,ky-2.5,'#ffb23a');pxText(String(gear+1),kx,ky-2.5,'#ffb23a')}
   for(const [side,key2,gl] of [[-1,'armL','gloveL'],[1,'armR','gloveR']]){
-    const a=C[key2],img=CK[key2],isR=side>0,off=isR?hbo:[0,0],ang=isR?th*(1-Math.max(hb,gs)*.7):th;
-    const w0=a.wrist,wn0=rot(w0,ang);const Wn=[wn0[0]+off[0]+armJx*1.5,wn0[1]+off[1]+armJy*1.5];
+    const a=C[key2],img=CK[key2],isR=side>0,g=CK[gl],b=C[gl].box;
+    const grip=isR?Math.max(hb,hw):0,ang=th*(1-.88*grip);
+    let off=[0,0];
+    if(isR){
+      const gc=[b[0]+g.width/2,b[1]+g.height/2],rc=rot(gc,ang);
+      const sx=(kx-3-rc[0])*hw,sy=(ky+9-rc[1])*hw-Math.sin(Math.PI*hw)*9;           // trajetoria ate a alavanca, com arco
+      off=[sx*1+hb*(1-hw)*26,sy+hb*(1-hw)*34];
+    }
+    const jx=armJx*1.5,jy=armJy*1.5,w0=a.wrist,wn0=rot(w0,ang),Wn=[wn0[0]+off[0]+jx,wn0[1]+off[1]+jy];
     const A=[w0[0]+side*6,w0[1]+(img.height-(w0[1]-a.box[1]))];
     armDraw(img,a.box,w0,Wn,A);
-    const b=C[gl].box,g=CK[gl],cp=rot(b,ang);
-    ctx.save();ctx.translate(H0[0]+(cp[0]-H0[0])+off[0]+armJx*1.5,H0[1]+(cp[1]-H0[1])+off[1]+armJy*1.5);ctx.rotate(ang);ctx.drawImage(g,0,0);ctx.restore();
+    const cp=rot(b,ang);
+    ctx.save();ctx.translate(cp[0]+off[0]+jx,cp[1]+off[1]+jy);ctx.rotate(ang);ctx.drawImage(g,0,0);ctx.restore();
   }
   ctx.restore();
   // limpadores

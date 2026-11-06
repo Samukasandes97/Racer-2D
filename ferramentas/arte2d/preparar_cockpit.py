@@ -23,7 +23,7 @@ MIRROR=[(566,132),(792,132),(796,150),(792,188),(770,196),(585,196),(566,186)]
 SIDEM=[(-PX-5,368),(92,372),(96,420),(70,440),(-PX-5,444)]
 WINL=[(-PX-5,80),(45,72),(75,115),(110,205),(135,290),(152,350),(-PX-5,352)]
 WINR=[(1228,118),(1264+PX+5,100),(1264+PX+5,330),(1236,320),(1218,230)]
-RING=dict(c=HUB,r0=212,r1=278)
+RING=dict(c=HUB,r0=212,r1=274)
 SPOKES=[[(440,585),(570,598),(572,690),(446,650)],[(818,585),(690,598),(688,690),(812,650)],[(598,700),(662,700),(670,843),(590,843)]]
 GLOVE_L=[(318,552),(340,548),(362,575),(380,590),(405,585),(425,580),(442,592),(444,612),(432,632),(436,655),(430,680),(432,712),(424,738),(405,728),(388,745),(372,768),(345,778),(300,764),(258,752),(258,735),(264,640),(285,625),(300,600)]
 GLOVE_R=[(945,560),(900,548),(880,560),(855,585),(830,585),(815,598),(812,620),(822,640),(830,670),(836,700),(852,730),(868,742),(880,765),(905,778),(950,768),(1000,752),(1004,735),(990,700),(985,640),(960,610),(950,580)]
@@ -74,8 +74,16 @@ def save(img,alpha,name,box=None):
     return (x0*SC,y0*SC,c.shape[1],c.shape[0])
 save(work,bgA,'bg.png')
 # --- volante + maos (rigido): recorte quadrado em volta do cubo p/ girar facil ---
-glD=cv2.dilate(gl,np.ones((5,5),np.uint8))
-wimg=cv2.inpaint(im,cv2.dilate(glD&cv2.dilate(wheel,np.ones((9,9),np.uint8)),np.ones((3,3),np.uint8)),6,cv2.INPAINT_TELEA)
+# aro sob as luvas: copia do trecho limpo do proprio aro (rotacao de 60 graus em torno do cubo), sem borrao
+hx0,hy0=HUB[0]+PX,HUB[1]+PY
+ann=np.zeros((H,W),np.uint8); cv2.circle(ann,(hx0,hy0),278,255,-1); cv2.circle(ann,(hx0,hy0),208,0,-1)
+gD=cv2.dilate(poly(GLOVE_L)|poly(GLOVE_R),np.ones((9,9),np.uint8))&ann
+xs=np.arange(W)[None,:]*np.ones((H,1))
+rotCW=cv2.warpAffine(im,cv2.getRotationMatrix2D((hx0,hy0),-60,1),(W,H),flags=cv2.INTER_LINEAR)
+rotCCW=cv2.warpAffine(im,cv2.getRotationMatrix2D((hx0,hy0),60,1),(W,H),flags=cv2.INTER_LINEAR)
+wimg=im.copy()
+selR=(gD>0)&(xs>hx0); selL=(gD>0)&(xs<=hx0)
+wimg[selR]=rotCW[selR]; wimg[selL]=rotCCW[selL]
 rig=cv2.dilate(wheel,np.ones((3,3),np.uint8))
 hx,hy=HUB[0]+PX,HUB[1]+PY; half=330
 box=(hx-half,hy-half,hx+half,min(hy+half,H)) 
