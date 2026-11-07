@@ -64,3 +64,10 @@
 - Colisão em 4 camadas de altura (rampas, pontes, escadas): o carro sobe/desce pela camada mais alta que alcança (degrau 0,14); cai com gravidade; câmera acompanha a inclinação.
 - Mapa inteiro fica na memória (nada descarrega); carrega do mais perto pro mais longe, com barra de progresso; draw distance 6,5 -> 12 unidades (~144 m) com corte por bloco. Posições em uint16 + uniforms (menos memória).
 - Buracos: telhados gerados em todos os prédios (altura da parede mais próxima) + chão escuro sob o mapa todo. Atlas ganhou um slot de cor para isso.
+
+## Mundo aberto — física, hitbox, volante e trânsito (07/11/2026)
+- Física: pneu com limite de aderência (subesterço, derrapagem, freio de mão solta a traseira), giro com inércia, ré segurando o freio parado, batida com hitbox (contorno de 16 pontos) e deslize em paredes; chão suave sem "voar" (cai só em degrau grande).
+- Chão: alturas interpoladas por triângulo (camadas separadas por 0,03); obstáculos em grade de 0,1 un (postes, caixas, grades); sinais pendurados não bloqueiam. Faces de rua invertidas e frestas pequenas viram chão.
+- Botão de volante na tela: arrasta e gira ±95° (190° no total), volta ao centro sozinho; alterna com as setas pelo ícone do volante.
+- Trânsito (trafego.js): ruas extraídas do mapa (ferramentas/mapa/extrair_vias.py -> mapa/vias.json); carros 3D simples seguem a mão direita, limite por tipo de via (rua estreita 30, rua 40, avenida 55, via rápida 80 km/h), distância do carro da frente (IDM), semáforos com ciclo de 36 s nos cruzamentos (luz vermelha/amarela/verde desenhada), curvas mais lentas. Colisão com o jogador.
+- Pendências conhecidas: faixas ficam no centro do corredor do chão (nem sempre = linha amarela do mapa); jogador não é multado por furar sinal; luz global/dia-noite e luz nos prédios ficam para depois.

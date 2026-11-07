@@ -37,26 +37,31 @@ button:active,button.on{background:var(--neon);border-color:var(--neon);color:#1
   .gl,.gr{width:auto}.gl button,.gr button{width:68px;height:62px}
   .gl,.gr{grid-template-columns:repeat(2,auto)}
 }
+#wp{display:none;grid-column:1/-1;place-items:center;border:1.5px solid var(--line);border-radius:14px;background:var(--panel);touch-action:none;user-select:none;-webkit-user-select:none;position:relative;height:clamp(64px,13dvh,92px);width:100%;overflow:hidden}
+#wp svg{height:92%;width:auto;fill:none;stroke:currentColor;stroke-width:2.2;pointer-events:none;color:#cfd6ff}
+#wp .tk{position:absolute;bottom:2px;font:9px ui-monospace,monospace;color:var(--muted);pointer-events:none}
+.wh #wp{display:grid}.wh #bl,.wh #br{display:none}
 @media (pointer:coarse){.msg{display:none}}
 @media (prefers-reduced-motion:reduce){.msg{transition:none}}
 </style>
 
-<div class="app">
+<div class="app wh" id="app">
   <div class="stage" id="stage">
     <canvas id="c" aria-label="Carro laranja correndo numa rua de Shibuya à noite, na chuva"></canvas>
     <div class="hud" id="hud">0<small>km/h</small></div>
     <div class="msg" id="msg">teclado: setas/WASD · Espaço freio de mão · N nitro · E/Z marcha · C câmera</div>
   </div>
   <div class="ctl">
-    <div class="tg"><button id="tv" class="" title="Câmera 1ª pessoa (C)" aria-label="Câmera 1ª pessoa (C)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8h3.5l2-3h6l2 3h3.5v11h-17z"/><circle cx="12" cy="13" r="3.6"/></svg></button><button id="tl" class=" on" title="Faróis (L)" aria-label="Faróis (L)" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5h6M10 21h4M12 3a6 6 0 00-3.5 10.8V16h7v-2.2A6 6 0 0012 3z"/></svg></button><button id="th" class="" title="Pisca-alerta (H)" aria-label="Pisca-alerta (H)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.2"/></svg></button><button id="tw" class="" title="Limpador (Q)" aria-label="Limpador (Q)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18a9 9 0 0118 0M12 18l5.5-9"/></svg></button><button id="td" class="" title="Desembaçar" aria-label="Desembaçar" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7c2-2 3 2 5 0s3 2 5 0 3 2 5 0M4 12c2-2 3 2 5 0s3 2 5 0 3 2 5 0M4 17c2-2 3 2 5 0s3 2 5 0 3 2 5 0"/></svg></button><button id="tg" class="" title="Câmbio manual" aria-label="Câmbio manual" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor" stroke="none">M</text></svg></button><button id="ta" class=" on" title="Anti-lag" aria-label="Anti-lag" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c1 4 6 5 6 10.5a6 6 0 01-12 0c0-2.200 1-3.500 2.500-4.500 0 2 1 3 2 3 0-4 0-6 1.500-9z"/></svg></button><button id="tf" class=" on" title="Filtro pixel-art" aria-label="Filtro pixel-art" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.500" height="6.500"/><rect x="13.500" y="4" width="6.500" height="6.500"/><rect x="4" y="13.500" width="6.500" height="6.500"/><rect x="13.500" y="13.500" width="6.500" height="6.500"/></svg></button><button id="tr" class=" on" title="Chuva" aria-label="Chuva" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14a4 4 0 010-8 5 5 0 019.500 1A3.500 3.500 0 0116.500 14zM9 17l-1 3.500M13 17l-1 3.500M17 17l-1 3.500"/></svg></button><button id="ts" class=" on" title="Som do motor" aria-label="Som do motor" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.500v5h4l5 4v-13l-5 4zM16 9a4 4 0 010 6M18.500 6a8 8 0 010 12"/></svg></button></div>
+    <div class="tg"><button id="tv" class="" title="Câmera 1ª pessoa (C)" aria-label="Câmera 1ª pessoa (C)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8h3.5l2-3h6l2 3h3.5v11h-17z"/><circle cx="12" cy="13" r="3.6"/></svg></button><button id="tl" class=" on" title="Faróis (L)" aria-label="Faróis (L)" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5h6M10 21h4M12 3a6 6 0 00-3.5 10.8V16h7v-2.2A6 6 0 0012 3z"/></svg></button><button id="th" class="" title="Pisca-alerta (H)" aria-label="Pisca-alerta (H)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.2"/></svg></button><button id="tw" class="" title="Limpador (Q)" aria-label="Limpador (Q)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18a9 9 0 0118 0M12 18l5.5-9"/></svg></button><button id="td" class="" title="Desembaçar" aria-label="Desembaçar" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7c2-2 3 2 5 0s3 2 5 0 3 2 5 0M4 12c2-2 3 2 5 0s3 2 5 0 3 2 5 0M4 17c2-2 3 2 5 0s3 2 5 0 3 2 5 0"/></svg></button><button id="tg" class="" title="Câmbio manual" aria-label="Câmbio manual" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor" stroke="none">M</text></svg></button><button id="ta" class=" on" title="Anti-lag" aria-label="Anti-lag" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c1 4 6 5 6 10.5a6 6 0 01-12 0c0-2.200 1-3.500 2.500-4.500 0 2 1 3 2 3 0-4 0-6 1.500-9z"/></svg></button><button id="tf" class=" on" title="Filtro pixel-art" aria-label="Filtro pixel-art" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.500" height="6.500"/><rect x="13.500" y="4" width="6.500" height="6.500"/><rect x="4" y="13.500" width="6.500" height="6.500"/><rect x="13.500" y="13.500" width="6.500" height="6.500"/></svg></button><button id="tr" class=" on" title="Chuva" aria-label="Chuva" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14a4 4 0 010-8 5 5 0 019.500 1A3.500 3.500 0 0116.500 14zM9 17l-1 3.500M13 17l-1 3.500M17 17l-1 3.500"/></svg></button><button id="ts" class=" on" title="Som do motor" aria-label="Som do motor" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.500v5h4l5 4v-13l-5 4zM16 9a4 4 0 010 6M18.500 6a8 8 0 010 12"/></svg></button><button id="tk" class="on" title="Volante / setas" aria-label="Volante ou setas" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 14v7M10 11.2L3.5 9.5M14 11.2l6.5-1.7"/></svg></button></div>
     <div class="main">
-      <div class="gl"><button id="bl" class="" title="Virar à esquerda" aria-label="Virar à esquerda" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><button id="br" class="" title="Virar à direita" aria-label="Virar à direita" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button><button id="gd" class="" title="Reduzir marcha (Z)" aria-label="Reduzir marcha (Z)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5V7z"/><path d="M8.5 12h7"/></svg></button><button id="gu" class="" title="Subir marcha (E)" aria-label="Subir marcha (E)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5V7z"/><path d="M8.5 12h7M12 8.5v7"/></svg></button></div>
+      <div class="gl"><div id="wp" aria-label="Volante (arraste para girar, 190 graus)"><svg id="wsv" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="42" stroke-width="7"/><circle cx="50" cy="50" r="9" fill="currentColor"/><path d="M50 59v33M41 46L10 38M59 46l31-8" stroke-width="6"/><path d="M50 4v9" stroke="#ff4fa3" stroke-width="5"/></svg></div><button id="bl" class="" title="Virar à esquerda" aria-label="Virar à esquerda" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><button id="br" class="" title="Virar à direita" aria-label="Virar à direita" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button><button id="gd" class="" title="Reduzir marcha (Z)" aria-label="Reduzir marcha (Z)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5V7z"/><path d="M8.5 12h7"/></svg></button><button id="gu" class="" title="Subir marcha (E)" aria-label="Subir marcha (E)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5V7z"/><path d="M8.5 12h7M12 8.5v7"/></svg></button></div>
       <div class="gr"><button id="bb" class="" title="Frear" aria-label="Frear" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="ba" class="" title="Acelerar" aria-label="Acelerar" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18l6-6 6 6M6 11l6-6 6 6"/></svg></button><button id="bd" class="" title="Freio de mão (drift)" aria-label="Freio de mão (drift)" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M10.5 15V9h2.2a1.7 1.7 0 010 3.4h-2.2M3.5 8a9 9 0 000 8M20.5 8a9 9 0 010 8"/></svg></button><button id="bn" class="nitro" title="Nitro" aria-label="Nitro" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5L5 14h6l-1 7.5L19 10h-6z" fill="currentColor"/></svg></button></div>
     </div>
   </div>
 </div>
 
 <script src="world3d.js"></script>
+<script src="trafego.js"></script>
 <script>
 // ---------- util ----------
 const W=480,H=270,HOR=135;
@@ -261,31 +266,79 @@ const MAXSPD=SEG*60*.6,BRK=-MAXSPD/2.5,DEC=-MAXSPD/8,OFFD=-MAXSPD/2,OFFL=MAXSPD/
 const accel=p=>MAXSPD*(.075*(1-p)+.0094);
 let pos=0,px=0,spd=0,steer=0,skyX=0,t=0,rainOn=true,filt=true;
 const CARS=1.5,CARW=.62;let pitS=0;const key={l:0,r:0,b:0,a:0,d:0,n:0};const nitro={on:false,tank:1,k:0};
+let wAng=0,wheelOn=false,wDrag=null;                                  // volante de tela: -95..95 graus (190 no total)
+(function(){const wp=document.getElementById('wp'),sv=document.getElementById('wsv'),app=document.getElementById('app');
+  const ang=(e,r)=>Math.atan2(e.clientY-(r.top+r.height/2),e.clientX-(r.left+r.width/2))*180/Math.PI;
+  wp.addEventListener('pointerdown',e=>{e.preventDefault();wp.setPointerCapture(e.pointerId);const r=wp.getBoundingClientRect();wDrag={r,a:ang(e,r),id:e.pointerId};wheelOn=true});
+  wp.addEventListener('pointermove',e=>{if(!wDrag||e.pointerId!==wDrag.id)return;const a=ang(e,wDrag.r);let d=a-wDrag.a;if(d>180)d-=360;if(d<-180)d+=360;wDrag.a=a;wAng=clamp(wAng+d,-95,95)});
+  const up=e=>{if(wDrag&&e.pointerId===wDrag.id)wDrag=null};wp.addEventListener('pointerup',up);wp.addEventListener('pointercancel',up);
+  window.__wheelTick=dt=>{if(!wDrag){wAng*=Math.exp(-dt*7);if(Math.abs(wAng)<.8){wAng=0;wheelOn=false}}sv.style.transform='rotate('+wAng+'deg)'};
+  const tk=document.getElementById('tk');tk.addEventListener('click',()=>{const on=app.classList.toggle('wh');tk.classList.toggle('on',on);tk.setAttribute('aria-pressed',on);wAng=0;wheelOn=false});
+})();
 const hud=document.getElementById('hud'),msg=document.getElementById('msg');
 
 function segAt(z){return segs[Math.floor(((z%TRACK)+TRACK)%TRACK/SEG)%N]}
 const WORLD=true,MPU=12;                      // mundo aberto: 1 unidade do mapa = 12 m
+// ---- fisica do carro no mundo aberto: pneu com limite de aderencia (circulo de atrito), peso, escorregada, batida com hitbox ----
+let vl=0,om=0,wslip=0,vrev=0;                                              // velocidade lateral (m/s, + = direita), giro (rad/s, + = direita)
+const CAR_PTS=(()=>{const a=[];for(const l of [-.17,-.085,0,.085,.17])for(const r of [-.07,-.035,0,.035,.07])if(Math.abs(l)>.16||Math.abs(r)>.06)a.push([l,r]);return a})();   // contorno do carro (unidades do mapa)
 function worldStep(dt,pct){
   const W3=World3D;if(!W3.ready)return;
-  if(!wInit){wx=W3.start.x;wz=W3.start.z;hd=W3.start.hd;gy=W3.height(wx,wz,.3)||0;vgy=0;wInit=true}
+  if(!wInit){if(!Trafego.ready&&!Trafego.error)return;wx=W3.start.x;wz=W3.start.z;hd=W3.start.hd;
+    if(Trafego.ready){let b=null,bd=1e9;for(const l of Trafego.lanes){if(l.len<6)continue;for(let i=0;i<l.pts.length-1;i++){const p=l.pts[i],q=l.pts[i+1],dx=q[0]-p[0],dz=q[1]-p[1],L2=dx*dx+dz*dz||1,L=Math.sqrt(L2);if(L<1.5||(dx*Math.sin(hd)+dz*Math.cos(hd))/L<.985)continue;
+        let u=((wx-p[0])*dx+(wz-p[1])*dz)/L2;u=Math.max(0,Math.min(1,u));const qx=p[0]+dx*u,qz=p[1]+dz*u,d=Math.hypot(qx-wx,qz-wz);if(d<bd){bd=d;b=[qx,qz,Math.atan2(dx,dz)]}}}
+      if(b&&bd<2.5){wx=b[0];wz=b[1];hd=b[2]}}
+    gy=W3.height(wx,wz,.3)||0;vgy=0;vl=0;om=0;wInit=true}
   if(!W3.tilesReady(wx,wz,8)){spd=0;return}                              // espera o mapa em volta carregar
-  const v_ms=spd/MAXSPD*KMH/3.6,v=v_ms/MPU;                           // m/s e unidades/s
-  const sa=clamp(steer*.5/(1+v_ms/16),-.5,.5);
-  hd-=(v_ms/2.9*Math.tan(sa)*.62+slip*1.1*pct)*dt;                    // esterçar a direita diminui o rumo
-  const da=hd+slip*.42*pct,nx=wx+Math.sin(da)*v*dt,nz=wz+Math.cos(da)*v*dt;
-  const ok=(x,z)=>{const h=W3.height(x,z,gy);return h!==null},fx=Math.sin(hd)*.18,fz=Math.cos(hd)*.18;
-  if(ok(nx+fx,nz+fz)&&ok(nx,nz)){wx=nx;wz=nz}
-  else if(ok(nx+fx,wz+fz)&&ok(nx,wz)){wx=nx;spd*=1-Math.min(1,dt*3)}
-  else if(ok(wx+fx,nz+fz)&&ok(wx,nz)){wz=nz;spd*=1-Math.min(1,dt*3)}
-  else{if(spd>MAXSPD*.12){physKick(-12);crashT=.4}spd*=.3}
-  const h=W3.height(wx,wz,gy);
-  if(h!==null){if(h>=gy){gy+=(h-gy)*Math.min(1,dt*14);vgy=0}else{vgy+=2.6*dt;gy=Math.max(h,gy-vgy*dt);if(gy===h)vgy=0}}   // sobe suave em rampas; cai com gravidade de pontes
+  const U=MAXSPD/(KMH/3.6);                                              // unidades de spd por m/s
+  if(key.b&&spd<U*1.2&&!key.a)vrev=Math.min(7,vrev+3.2*dt);else vrev=Math.max(0,vrev-12*dt);   // segurar o freio parado = re
+  const vf=spd/U-vrev,v=Math.hypot(vf,vl);
+  // ---- esterco: angulo das rodas diminui com a velocidade; aderencia limita a curva (subesterco)
+  const mu=rainOn?.82:1.05,amax=mu*9.8,hb=key.d&&vf>6;
+  const dl=clamp(steer*.5/(1+vf*vf/150),-.5,.5);
+  let wDes=-vf/2.6*Math.tan(dl)*(hb?1.35:1);                          // + = esquerda no mundo (hd cresce a esquerda)
+  const aReq=Math.abs(wDes)*vf,lim=amax*(hb?.75:1.1);
+  if(aReq>lim)wDes*=lim/aReq;
+  om+=(wDes-om)*Math.min(1,dt*(hb?6:10));hd+=om*dt;
+  // ---- pneu: forca lateral se opoe a velocidade lateral, saturada pela aderencia (traseira solta no freio de mao)
+  const rear=amax*(hb?.38:1),Kt=9;
+  vl+=om*vf*dt;                                                  // o giro do carro "gira" o vetor velocidade em relacao ao carro
+  const want=Math.abs(vl)*Kt;
+  let lost=0;
+  if(want<=rear){vl*=Math.exp(-Kt*dt)}else{const d=rear*dt;vl-=Math.sign(vl)*d;lost=d}
+  if(lost>0)spd=Math.max(0,spd-U*lost*Math.min(1,Math.abs(vl)/Math.max(v,3))*.9);   // derrapar gasta velocidade
+  // ---- movimento (m/s -> unidades), com hitbox
+  const fx=Math.sin(hd),fz=Math.cos(hd),rx=-Math.cos(hd),rz=Math.sin(hd);
+  let vx=(fx*vf+rx*vl)/MPU,vz=(fz*vf+rz*vl)/MPU;
+  const solid=(x,z)=>W3.height(x,z,gy,.05)===null||W3.obs(x,z);
+  const blocked=(x,z)=>{for(const p of CAR_PTS)if(solid(x+fx*p[0]+rx*p[1],z+fz*p[0]+rz*p[1]))return true;return false};
+  const nx=wx+vx*dt,nz=wz+vz*dt;let hit=0;
+  if(!blocked(nx,nz)){wx=nx;wz=nz}
+  else if(!blocked(nx,wz)){wx=nx;hit=Math.abs(vz)*MPU;vz=0}
+  else if(!blocked(wx,nz)){wz=nz;hit=Math.abs(vx)*MPU;vx=0}
+  else{hit=Math.hypot(vx,vz)*MPU;vx=vz=0}
+  if(hit>0){                                                           // refaz as componentes do carro depois da batida
+    const nvf=(vx*fx+vz*fz)*MPU,nvl=(vx*rx+vz*rz)*MPU;if(nvf>=0){spd=nvf*U;vrev=0}else{spd=0;vrev=-nvf}vl=nvl;
+    if(hit>3.5&&crashT<=0){physKick(-clamp(hit*.8,4,16));crashT=.4;spd*=.75}}
+  if(crashT>0)crashT-=dt;
+  // ---- chao: segue a altura sob frente/centro/tras (suave; so cai de verdade em degrau grande)
+  let hs=0,hn=0;for(const o of [.15,0,-.15]){const h=W3.height(wx+fx*o,wz+fz*o,gy,.05);if(h!==null){hs+=h;hn++}}
+  if(hn){const h=hs/hn;
+    if(h<gy-.25){vgy+=2.6*dt;gy=Math.max(h,gy-vgy*dt)}else{vgy=0;gy+=(h-gy)*Math.min(1,dt*14)}}
+  {const pl={x:wx,z:wz,hd,v:vf};Trafego.update(dt,t,pl);
+   const k=Trafego.collide(pl);
+   if(k.hit&&crashT<=0){const l=Math.hypot(k.dx,k.dz)||1,nx=k.dx/l,nz=k.dz/l;
+     if(!blocked(wx+nx*.03,wz+nz*.03)){wx+=nx*.03;wz+=nz*.03}
+     physKick(-clamp(k.rv*.7,3,14));crashT=.35;spd*=.55;vl*=.5;k.car.v*=.4}}
+  // derrapagem visual: o carro aponta pra dentro da curva (mesmo sentido do slip do jogo)
+  wslip=clamp(-vl/Math.max(Math.abs(vf),4)*2.6,-1,1);slip+=(wslip-slip)*Math.min(1,dt*12);
 }
 function update(dt){
+  window.__wheelTick&&window.__wheelTick(dt);
   const sg=segAt(pos),pct=spd/MAXSPD;
   pos=(pos+dt*spd)%TRACK;
   const dx=dt*2*pct;
-  const inp=key.r-key.l;
+  const inp=wheelOn?clamp(wAng/95,-1,1):key.r-key.l;
   steer+=(inp-steer)*Math.min(1,dt*(view==='cab'?4.5:7));
   // derrapagem: segurou a curva por muito tempo em velocidade -> o carro escorrega de lado (drift); soltar ou contra-esterçar recupera
   if(inp!==0){if(Math.sign(inp)===holdDir)holdT+=dt;else{holdDir=Math.sign(inp);holdT=0}}else holdT=Math.max(0,holdT-dt*3);
@@ -546,8 +599,9 @@ function drawWorld(){
   ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,0,W,H);
   if(W3.ready)W3.stream(wx,wz);
   if(!W3.ready||!wInit||!W3.tilesReady(wx,wz,8)){const pr=W3.ready?W3.progress():0;ctx.fillStyle='#8c93b8';ctx.font='10px monospace';ctx.fillText('carregando o mapa... '+Math.round(pr*100)+'%',W/2-70,H/2);ctx.fillStyle='#2a3050';ctx.fillRect(W/2-70,H/2+8,140,4);ctx.fillStyle='#8c93b8';ctx.fillRect(W/2-70,H/2+8,140*pr,4);return}
-  const fx=Math.sin(hd),fz=Math.cos(hd),eh=cabv?.095:.22,back=cabv?0:.6,ah=W3.height(wx+fx*1.4,wz+fz*1.4,gy+.3),pit=ah===null?0:clamp(ah-gy,-.3,.3);pitS+=(pit-pitS)*.08;
+  const fx=Math.sin(hd),fz=Math.cos(hd),eh=cabv?.095:.22,back=cabv?0:.6,ah=W3.height(wx+fx*1.4,wz+fz*1.4,gy,.1),pit=ah===null?0:clamp(ah-gy,-.15,.15);pitS+=(pit-pitS)*.05;
   const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*3,gy+eh-.003+pitS*1.6,wz+fz*3]:[wx+fx*1.5,gy+.12+pitS*1.1,wz+fz*1.5],fov:cabv?.95:.88,far:12};
+  W3.dynBegin();Trafego.draw(W3,{x:wx,z:wz},t,gy);
   W3.render(cam,{p:[wx,gy,wz],fwd:[fx,fz],head:lightsOn?1:0},[HAZE[0]/255,HAZE[1]/255,HAZE[2]/255],[.62,.7,1.05],t);
   hzY=W3.project(cam,[cam.eye[0]+fx*500,cam.eye[1],cam.eye[2]+fz*500])[1];
   ctx.save();ctx.translate(0,hzY-HOR);ctx.drawImage(SKY,0,0);
@@ -810,7 +864,7 @@ function step(dt){
 let last=performance.now();
 function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;step(dt);render();requestAnimationFrame(tick)}
 requestAnimationFrame(tick);
-window.__test={get hw(){return hw},pend,set view(v){view=v},get wheelA(){return wheelA},nitro,wiper,DROPS,BODY,WH,get slip(){return slip},get lvl(){return lvl},step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
+window.__test={get w(){return {x:wx,z:wz,hd,gy,vl,om,spd:spd/MAXSPD*KMH,slip,crash:crashT}},setW:(x,z,h,sp)=>{wx=x;wz=z;hd=h;spd=sp/KMH*MAXSPD;vl=0;om=0},get hw(){return hw},pend,set view(v){view=v},get wheelA(){return wheelA},nitro,wiper,DROPS,BODY,WH,get slip(){return slip},get lvl(){return lvl},step,render,set:(p,x,s)=>{pos=p;px=x;spd=s},key};
 // ---------- controles ----------
 const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};

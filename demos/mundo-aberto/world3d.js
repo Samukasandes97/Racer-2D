@@ -46,11 +46,12 @@ const img=new Image();img.onload=()=>{tex=gl.createTexture();gl.bindTexture(gl.T
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)};
 img.src=MAP+'atlas.png';
-Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.wav').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json())]).then(([cfg,g,st])=>{
-  W3.cfg=cfg;W3.grid=new Int16Array(g);W3.start=st;index=cfg.tiles;W3.ready=true}).catch(e=>{W3.error=String(e)});
+Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.wav').then(r=>r.arrayBuffer()),fetch(MAP+'obs.wav').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json())]).then(([cfg,g,ob,st])=>{
+  W3.cfg=cfg;W3.grid=new Int16Array(g);W3.obsg=new Uint8Array(ob);W3.start=st;index=cfg.tiles;W3.ready=true}).catch(e=>{W3.error=String(e)});
 // altura do chao em camadas (pontes, rampas, tuneis). Retorna a camada mais alta que o carro alcanca (<= gy+degrau); null = parede/vazio
-W3.height=function(x,z,gy){const c=W3.cfg;if(!c)return 0;const ix=Math.floor((x-c.x0)/c.CELL),iz=Math.floor((z-c.z0)/c.CELL);
-  if(ix<0||iz<0||ix>=c.GW||iz>=c.GH)return null;const n=c.GW*c.GH,lim=(gy===undefined?9:gy)+.14;let best=null;
+W3.obs=function(x,z){const c=W3.cfg;if(!c)return false;const ix=Math.floor((x-c.x0)/c.OS),iz=Math.floor((z-c.z0)/c.OS);return ix>=0&&iz>=0&&ix<c.OW&&iz<c.OH&&W3.obsg[iz*c.OW+ix]===1};
+W3.height=function(x,z,gy,step){const c=W3.cfg;if(!c)return 0;const ix=Math.floor((x-c.x0)/c.CELL),iz=Math.floor((z-c.z0)/c.CELL);
+  if(ix<0||iz<0||ix>=c.GW||iz>=c.GH)return null;const n=c.GW*c.GH,lim=(gy===undefined?9:gy)+(step===undefined?.14:step);let best=null;
   for(let l=0;l<c.LAY;l++){const v=W3.grid[l*n+iz*c.GW+ix];if(v===-32768)break;const h=v/1000;if(h<=lim&&(best===null||h>best))best=h}
   return best};
 let inflight=0;
@@ -90,6 +91,40 @@ W3.render=function(cam,car,fog,tint,time){
     gl.bindBuffer(gl.ARRAY_BUFFER,o.bu);gl.vertexAttribPointer(A.T,2,gl.UNSIGNED_SHORT,true,0,0);
     gl.bindBuffer(gl.ARRAY_BUFFER,o.bs);gl.vertexAttribPointer(A.S,1,gl.UNSIGNED_BYTE,true,0,0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,o.bi);gl.drawElements(gl.TRIANGLES,o.n,gl.UNSIGNED_SHORT,0)}
+  W3.dynDraw(cam,fog,tint);
+};
+
+// ---------- geometria dinamica (carros do trânsito, semáforos): caixas coloridas desenhadas junto do mapa ----------
+const VS2=`attribute vec3 aP;attribute vec4 aC;uniform mat4 uM;varying vec4 vC;varying float vD;void main(){vec4 c=uM*vec4(aP,1.);gl_Position=c;vC=aC;vD=c.w;}`;
+const FS2=`precision mediump float;uniform vec3 uFog,uTint;uniform vec2 uFogR;varying vec4 vC;varying float vD;
+void main(){vec3 col=vC.rgb*(1.-vC.a)*uTint+vC.rgb*vC.a;float f=clamp((vD-uFogR.x)/(uFogR.y-uFogR.x),0.,1.);col=mix(col,uFog,f*f*(3.-2.*f));gl_FragColor=vec4(col,1.);}`;
+const pr2=gl.createProgram();gl.attachShader(pr2,sh(gl.VERTEX_SHADER,VS2));gl.attachShader(pr2,sh(gl.FRAGMENT_SHADER,FS2));gl.linkProgram(pr2);
+const A2={P:gl.getAttribLocation(pr2,'aP'),C:gl.getAttribLocation(pr2,'aC')};
+const U2={};['uM','uFog','uTint','uFogR'].forEach(n=>U2[n]=gl.getUniformLocation(pr2,n));
+const dynBuf=gl.createBuffer();let dyn=new Float32Array(7*36*2000),dn=0;
+const FACE=[[0,1,0,1],[0,-1,0,.5],[1,0,0,.8],[-1,0,0,.8],[0,0,1,.9],[0,0,-1,.9]];
+// caixa orientada: centro (cx,cy,cz), meio-tamanho hl (frente), hh (altura), hw (lado), rumo hd; cor rgb 0..1; em = emissivo 0..1
+W3.dynBegin=()=>{dn=0};
+W3.box=function(cx,cy,cz,hl,hh,hw,hd,r,g,b,em){
+  if((dn+36)*7>dyn.length){const nd=new Float32Array(dyn.length*2);nd.set(dyn);dyn=nd}
+  const s=Math.sin(hd),c=Math.cos(hd);
+  const P=(a,bb,cc)=>{const lx=a*hl,ly=bb*hh,lz=cc*hw;return [cx+s*lx-c*lz,cy+ly,cz+c*lx+s*lz]};   // frente = (sin,cos); direita = (-cos,sin)
+  const faces=[[[1,1,1],[1,1,-1],[-1,1,-1],[-1,1,1],1],[[1,-1,1],[-1,-1,1],[-1,-1,-1],[1,-1,-1],.45],
+    [[1,-1,1],[1,-1,-1],[1,1,-1],[1,1,1],.88],[[-1,-1,-1],[-1,-1,1],[-1,1,1],[-1,1,-1],.88],
+    [[1,-1,1],[1,1,1],[-1,1,1],[-1,-1,1],.72],[[1,-1,-1],[-1,-1,-1],[-1,1,-1],[1,1,-1],.72]];
+  for(const f of faces){const sh_=f[4],q=[P(...f[0]),P(...f[1]),P(...f[2]),P(...f[3])];
+    for(const k of [0,1,2,0,2,3]){const p=q[k],o=dn*7;dyn[o]=p[0];dyn[o+1]=p[1];dyn[o+2]=p[2];dyn[o+3]=r*sh_;dyn[o+4]=g*sh_;dyn[o+5]=b*sh_;dyn[o+6]=em||0;dn++}}
+};
+W3.dynDraw=function(cam,fog,tint){
+  if(!dn)return;
+  const M=m4.mul(m4.persp(cam.fov,480/270,.02,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
+  gl.useProgram(pr2);gl.uniformMatrix4fv(U2.uM,false,M);gl.uniform3f(U2.uFog,fog[0],fog[1],fog[2]);gl.uniform3f(U2.uTint,tint[0],tint[1],tint[2]);gl.uniform2f(U2.uFogR,cam.far*.35,cam.far);
+  gl.bindBuffer(gl.ARRAY_BUFFER,dynBuf);gl.bufferData(gl.ARRAY_BUFFER,dyn.subarray(0,dn*7),gl.DYNAMIC_DRAW);
+  gl.disableVertexAttribArray(A.T);gl.disableVertexAttribArray(A.S);gl.disableVertexAttribArray(A.P);
+  gl.enableVertexAttribArray(A2.P);gl.enableVertexAttribArray(A2.C);
+  gl.vertexAttribPointer(A2.P,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(A2.C,4,gl.FLOAT,false,28,12);
+  gl.drawArrays(gl.TRIANGLES,0,dn);
+  gl.disableVertexAttribArray(A2.P);gl.disableVertexAttribArray(A2.C);gl.useProgram(pr);
 };
 // projeta um ponto do mundo para a tela 480x270 (para achar o horizonte)
 W3.project=function(cam,p){const M=m4.mul(m4.persp(cam.fov,480/270,.02,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
