@@ -5,7 +5,8 @@ import sys,json,os,re,struct,numpy as np
 from PIL import Image,ImageDraw
 OBJ,TEX,OUT=sys.argv[1:4]; os.makedirs(OUT,exist_ok=True)
 T=12.8                       # tamanho do bloco (unidades do mapa)
-CELL=0.2                     # celula da grade de colisao
+CELL=0.1                     # celula da grade de colisao (escala 24 m/unidade: 2,4 m)
+K=0.2/CELL                   # fator p/ limiares em celulas
 # ---- le OBJ
 V=[];VT=[];FV=[];FT=[];FM=[];mats={};cur=0
 for l in open(OBJ,errors='ignore'):
@@ -68,7 +69,7 @@ def amostras(idx,dens=0.25,ret=False,cs=None):
     if ret=='uv':return pts,ti,u,v
     return (pts,ti) if ret else pts
 # --- camadas de altura: amostras dentro de cada triangulo virado pra cima => altura INTERPOLADA (rampas suaves)
-LAY=4
+LAY=3
 # chao = virado pra cima OU virado pra baixo rente ao chao (parte da malha da rua tem a face invertida: miolo de cruzamentos)
 up=np.where((ny>.5)|((ny<-.5)&(P[:,:,1].max(1)<.03)&(P[:,:,1].min(1)>-.05)))[0]
 pt=amostras(up)
@@ -111,15 +112,15 @@ for n_,i_ in mats.items():
     else:blackfrac[i_]=0
 blk=np.array([blackfrac[m]>.12 for m in FM])
 side=np.where((np.abs(ny)<=.5)&ok&~blk)[0]
-OS=0.1;OW=int((x1-x0)/OS)+2;OH=int((z1-z0)/OS)+2                    # obstaculos em celulas de 0,1 (1,2 m): postes finos nao somem
+OS=0.04;OW=int((x1-x0)/OS)+2;OH=int((z1-z0)/OS)+2                    # obstaculos em celulas de 0,04 (~1 m): postes finos nao somem
 pt,tix=amostras(side,1.5,True,OS);ymin=P[side,:,1].min(1)[tix]
 ci=np.clip(((pt[:,0]-x0)/CELL).astype(int),0,GW-1);cj=np.clip(((pt[:,2]-z0)/CELL).astype(int),0,GH-1)
 g0=layers[0][cj,ci]/1000.0;has=layers[0][cj,ci]!=-32768
 rel=pt[:,1]-g0
-hit=has&(rel>0.03)&(rel<0.12)&(ymin-g0<0.05)   # chega ate o chao e atinge a altura do carro (sinal pendurado nao conta)
+hit=has&(rel>0.02)&(rel<0.12)&(ymin-g0<0.05)   # chega ate o chao e atinge a altura do carro (sinal pendurado nao conta)
 oi=np.clip(((pt[:,0]-x0)/OS).astype(int),0,OW-1);oj=np.clip(((pt[:,2]-z0)/OS).astype(int),0,OH-1)
 obs=np.zeros((OH,OW),np.uint8);obs[oj[hit],oi[hit]]=1
-obs.tofile(os.path.join(OUT,'obs.wav'));print('celulas de obstaculo',int(obs.sum()))
+np.packbits(obs.ravel()).tofile(os.path.join(OUT,'obs.wav'))   # 1 bit por celula;print('celulas de obstaculo',int(obs.sum()))
 # ---- telhados: celulas sem superficie virada pra cima (topo dos predios) ganham um teto na altura da parede mais proxima
 from scipy.ndimage import distance_transform_edt
 void=(cnt==0)
@@ -140,7 +141,7 @@ tw=np.zeros((GH,GW),bool);tw[np.clip(((ptw[:,2]-z0)/CELL).astype(int),0,GH-1),np
 holes=np.zeros_like(void);FR=[]
 for i_ in range(1,nl+1):
     m=lab==i_;a_=int(m.sum())
-    if a_>12:continue                                   # so frestas pequenas na malha do chao; predios (grandes) continuam parede
+    if a_>12*K*K:continue                                   # so frestas pequenas na malha do chao; predios (grandes) continuam parede
     jj_,ii_=np.where(m)
     if jj_.min()==0 or ii_.min()==0 or jj_.max()==GH-1 or ii_.max()==GW-1:continue
     ring=binary_dilation(m,iterations=1)&~m
@@ -150,7 +151,7 @@ for i_ in range(1,nl+1):
 import collections;print('frac hist',np.histogram([f for a,f in FR],bins=[0,.02,.05,.1,.15,.2,.3,.5,1.01])[0].tolist(),'n',len(FR))
 print('celulas de buraco preenchidas',int(holes.sum()))
 Image.fromarray((np.stack([void*90+holes*165,void*60,void*60],2)).astype(np.uint8)).save('/tmp/t/holes.png')
-roofvoid=void&(d<12)&~holes
+roofvoid=void&(d<12*K)&~holes
 # altura do chao nos buracos = vizinho mais proximo com superficie
 _,(hi_,hj_)=distance_transform_edt(void,return_indices=True)
 l0=layers[0].astype(np.int32)
@@ -164,7 +165,7 @@ for r_ in range(GH):
     while c_<GW:
         if not holes[r_,c_]:c_+=1;continue
         e=c_
-        while e+1<GW and e-c_<15 and holes[r_,e+1] and row[e+1]==row[c_]:e+=1
+        while e+1<GW and e-c_<31 and holes[r_,e+1] and row[e+1]==row[c_]:e+=1
         HT.append((c_,e+1,r_,row[c_]));c_=e+1
 print('quads de chao nos buracos',len(HT))
 roofY=np.where(roofvoid,np.maximum(roofY,0.05),-9)
@@ -176,7 +177,7 @@ for r_ in range(GH):
     while c_<GW:
         if not roofvoid[r_,c_]:c_+=1;continue
         e=c_
-        while e+1<GW and e-c_<15 and roofvoid[r_,e+1] and row[e+1]==row[c_]:e+=1
+        while e+1<GW and e-c_<31 and roofvoid[r_,e+1] and row[e+1]==row[c_]:e+=1
         RT.append((c_,e+1,r_,row[c_]));c_=e+1
 print('quads de telhado',len(RT))
 rt=np.array(RT,np.float64)

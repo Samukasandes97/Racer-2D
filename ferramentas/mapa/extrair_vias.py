@@ -12,10 +12,10 @@ col=np.load(GC).astype(int)
 ground=(g!=-32768)&(np.abs(g)<60)                         # rente ao chao (ruas, calcadas); sem rampas/telhados
 green=(col[:,:,1]>col[:,:,0]+6)&(col[:,:,1]>col[:,:,2]+10)
 ground&=~green
-ground=binary_closing(ground,iterations=1)
-lab,n=label(ground);sz=np.bincount(lab.ravel());keep=np.isin(lab,np.where(sz>400)[0])&(lab>0);ground=keep
+ground=binary_closing(ground,iterations=2)
+lab,n=label(ground);sz=np.bincount(lab.ravel());keep=np.isin(lab,np.where(sz>1600)[0])&(lab>0);ground=keep
 dist=distance_transform_edt(ground)
-core=ground&(dist>=1.0)
+core=ground&(dist>=2.0)
 core=core
 sk=skeletonize(core)
 print('skeleton px',int(sk.sum()))
@@ -54,7 +54,7 @@ for ni,comp in enumerate(nodes):
             seen.add((a,j));seen.add((path[-1],path[-2]))
             if isnode[cur]:
                 e=nodeid[cur]
-                if e==ni and len(path)<6:continue
+                if e==ni and len(path)<12:continue
                 edges.append((ni,e,path))
 print('arestas brutas',len(edges))
 # ---- remove duplicadas (mesmo par/caminho invertido) e podar becos curtos
@@ -126,7 +126,13 @@ dg=np.zeros(len(NN),int)
 for e in ed:dg[e['a']]+=1;dg[e['b']]+=1
 used=sorted(set(e['a'] for e in ed)|set(e['b'] for e in ed));rm={n_:i for i,n_ in enumerate(used)}
 out_nodes=[NN[n_]+[int(dg[n_])] for n_ in used]
-out_edges=[dict(a=rm[e['a']],b=rm[e['b']],w=e['w'],p=np.round(np.array(e['p']),3).tolist()) for e in ed]
+# ruas retas: se o caminho nao se afasta mais de 0,12 da corda entre os dois nos, vira reta (grade urbana e ortogonal)
+def straighten(P):
+    P=np.array(P);a,b=P[0],P[-1];ab=b-a;L2=(ab**2).sum()
+    if L2==0:return P
+    t=np.clip(((P-a)@ab)/L2,0,1);d=np.linalg.norm(P-(a+t[:,None]*ab),axis=1)
+    return np.array([a,b]) if d.max()<0.12 else P
+out_edges=[dict(a=rm[e['a']],b=rm[e['b']],w=e['w'],p=np.round(straighten(e['p']),3).tolist()) for e in ed]
 print('depois da limpeza: nos',len(out_nodes),'arestas',len(out_edges),'cruzamentos(grau>=3)',sum(1 for n_ in out_nodes if n_[2]>=3))
 ws=np.array([e['w'] for e in out_edges]);print('arestas',len(out_edges),'largura pcts',np.percentile(ws,[5,25,50,75,95]).round(2))
 json.dump(dict(nodes=out_nodes,edges=out_edges),open(sys.argv[3],'w'))

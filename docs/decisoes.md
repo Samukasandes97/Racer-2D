@@ -71,3 +71,11 @@
 - Botão de volante na tela: arrasta e gira ±95° (190° no total), volta ao centro sozinho; alterna com as setas pelo ícone do volante.
 - Trânsito (trafego.js): ruas extraídas do mapa (ferramentas/mapa/extrair_vias.py -> mapa/vias.json); carros 3D simples seguem a mão direita, limite por tipo de via (rua estreita 30, rua 40, avenida 55, via rápida 80 km/h), distância do carro da frente (IDM), semáforos com ciclo de 36 s nos cruzamentos (luz vermelha/amarela/verde desenhada), curvas mais lentas. Colisão com o jogador.
 - Pendências conhecidas: faixas ficam no centro do corredor do chão (nem sempre = linha amarela do mapa); jogador não é multado por furar sinal; luz global/dia-noite e luz nos prédios ficam para depois.
+
+## 07/11/2026 (tarde) — escala do mundo, volante de 1,5 volta, trânsito refeito
+- Escala: 1 unidade do mapa = 24 m (antes 12). Carro 4,3 m = 0,18 un. Prédios agora ficam bem maiores que o carro (andares ≈ metade da altura do carro antes; agora proporcional). Câmeras, hitbox, passo de degrau, faróis e plano próximo da câmera reescalados.
+- Colisão mais fina: grade de altura com célula 0,1 (2,4 m) e obstáculos com célula 0,04 (~1 m), guardados em 1 bit por célula (obs.wav = 1,5 MB).
+- Volante: ±270° (1,5 volta), tanto no botão de volante da tela quanto no volante do cockpit.
+- Trânsito: faixas validadas contra paredes/obstáculos/degraus (faixa que não passa no teste é descartada ou aproximada do centro), conexões em curva dentro dos cruzamentos (sem esquerda cruzando fluxo contrário), sem retorno em beco, carros param no fim de rua sem saída, cruzamentos vizinhos compartilham o ciclo do semáforo (verde 11 s / amarelo 3 s / 4 s tudo vermelho), semáforo na calçada (~4,3 m), carros do tamanho real.
+- Teste automático (Playwright, sem renderizar): 3 min de trânsito simulado + 100 percursos do jogador pelas faixas. Resultado final: ~1 em 100 percursos com toque; carros dentro de parede ~1,7% das amostras (encostão de quina), sobreposição entre carros ~0,04%.
+- Ferramentas: extrair_vias.py agora endireita ruas (corda ≤ 0,12) e usa parâmetros em células na nova escala.

@@ -266,11 +266,11 @@ const MAXSPD=SEG*60*.6,BRK=-MAXSPD/2.5,DEC=-MAXSPD/8,OFFD=-MAXSPD/2,OFFL=MAXSPD/
 const accel=p=>MAXSPD*(.075*(1-p)+.0094);
 let pos=0,px=0,spd=0,steer=0,skyX=0,t=0,rainOn=true,filt=true;
 const CARS=1.5,CARW=.62;let pitS=0;const key={l:0,r:0,b:0,a:0,d:0,n:0};const nitro={on:false,tank:1,k:0};
-let wAng=0,wheelOn=false,wDrag=null;                                  // volante de tela: -95..95 graus (190 no total)
+let wAng=0,wheelOn=false,wDrag=null;                                  // volante de tela: -270..270 graus (1,5 volta, igual carro de verdade)
 (function(){const wp=document.getElementById('wp'),sv=document.getElementById('wsv'),app=document.getElementById('app');
   const ang=(e,r)=>Math.atan2(e.clientY-(r.top+r.height/2),e.clientX-(r.left+r.width/2))*180/Math.PI;
   wp.addEventListener('pointerdown',e=>{e.preventDefault();wp.setPointerCapture(e.pointerId);const r=wp.getBoundingClientRect();wDrag={r,a:ang(e,r),id:e.pointerId};wheelOn=true});
-  wp.addEventListener('pointermove',e=>{if(!wDrag||e.pointerId!==wDrag.id)return;const a=ang(e,wDrag.r);let d=a-wDrag.a;if(d>180)d-=360;if(d<-180)d+=360;wDrag.a=a;wAng=clamp(wAng+d,-95,95)});
+  wp.addEventListener('pointermove',e=>{if(!wDrag||e.pointerId!==wDrag.id)return;const a=ang(e,wDrag.r);let d=a-wDrag.a;if(d>180)d-=360;if(d<-180)d+=360;wDrag.a=a;wAng=clamp(wAng+d,-270,270)});
   const up=e=>{if(wDrag&&e.pointerId===wDrag.id)wDrag=null};wp.addEventListener('pointerup',up);wp.addEventListener('pointercancel',up);
   window.__wheelTick=dt=>{if(!wDrag){wAng*=Math.exp(-dt*7);if(Math.abs(wAng)<.8){wAng=0;wheelOn=false}}sv.style.transform='rotate('+wAng+'deg)'};
   const tk=document.getElementById('tk');tk.addEventListener('click',()=>{const on=app.classList.toggle('wh');tk.classList.toggle('on',on);tk.setAttribute('aria-pressed',on);wAng=0;wheelOn=false});
@@ -278,13 +278,13 @@ let wAng=0,wheelOn=false,wDrag=null;                                  // volante
 const hud=document.getElementById('hud'),msg=document.getElementById('msg');
 
 function segAt(z){return segs[Math.floor(((z%TRACK)+TRACK)%TRACK/SEG)%N]}
-const WORLD=true,MPU=12;                      // mundo aberto: 1 unidade do mapa = 12 m
+const WORLD=true,MPU=24;                      // mundo aberto: 1 unidade do mapa = 24 m (carro 4,3 m = .18 unid.)
 // ---- fisica do carro no mundo aberto: pneu com limite de aderencia (circulo de atrito), peso, escorregada, batida com hitbox ----
 let vl=0,om=0,wslip=0,vrev=0;                                              // velocidade lateral (m/s, + = direita), giro (rad/s, + = direita)
-const CAR_PTS=(()=>{const a=[];for(const l of [-.17,-.085,0,.085,.17])for(const r of [-.07,-.035,0,.035,.07])if(Math.abs(l)>.16||Math.abs(r)>.06)a.push([l,r]);return a})();   // contorno do carro (unidades do mapa)
+const CAR_PTS=(()=>{const a=[];for(const l of [-.09,-.045,0,.045,.09])for(const r of [-.036,-.018,0,.018,.036])if(Math.abs(l)>.08||Math.abs(r)>.03)a.push([l,r]);return a})();   // contorno do carro (unidades do mapa)
 function worldStep(dt,pct){
   const W3=World3D;if(!W3.ready)return;
-  if(!wInit){if(!Trafego.ready&&!Trafego.error)return;wx=W3.start.x;wz=W3.start.z;hd=W3.start.hd;
+  if(!wInit){Trafego.prepare(W3);if(!Trafego.ready&&!Trafego.error)return;wx=W3.start.x;wz=W3.start.z;hd=W3.start.hd;
     if(Trafego.ready){let b=null,bd=1e9;for(const l of Trafego.lanes){if(l.len<6)continue;for(let i=0;i<l.pts.length-1;i++){const p=l.pts[i],q=l.pts[i+1],dx=q[0]-p[0],dz=q[1]-p[1],L2=dx*dx+dz*dz||1,L=Math.sqrt(L2);if(L<1.5||(dx*Math.sin(hd)+dz*Math.cos(hd))/L<.985)continue;
         let u=((wx-p[0])*dx+(wz-p[1])*dz)/L2;u=Math.max(0,Math.min(1,u));const qx=p[0]+dx*u,qz=p[1]+dz*u,d=Math.hypot(qx-wx,qz-wz);if(d<bd){bd=d;b=[qx,qz,Math.atan2(dx,dz)]}}}
       if(b&&bd<2.5){wx=b[0];wz=b[1];hd=b[2]}}
@@ -310,7 +310,7 @@ function worldStep(dt,pct){
   // ---- movimento (m/s -> unidades), com hitbox
   const fx=Math.sin(hd),fz=Math.cos(hd),rx=-Math.cos(hd),rz=Math.sin(hd);
   let vx=(fx*vf+rx*vl)/MPU,vz=(fz*vf+rz*vl)/MPU;
-  const solid=(x,z)=>W3.height(x,z,gy,.05)===null||W3.obs(x,z);
+  const solid=(x,z)=>W3.height(x,z,gy,.025)===null||W3.obs(x,z);
   const blocked=(x,z)=>{for(const p of CAR_PTS)if(solid(x+fx*p[0]+rx*p[1],z+fz*p[0]+rz*p[1]))return true;return false};
   const nx=wx+vx*dt,nz=wz+vz*dt;let hit=0;
   if(!blocked(nx,nz)){wx=nx;wz=nz}
@@ -322,13 +322,13 @@ function worldStep(dt,pct){
     if(hit>3.5&&crashT<=0){physKick(-clamp(hit*.8,4,16));crashT=.4;spd*=.75}}
   if(crashT>0)crashT-=dt;
   // ---- chao: segue a altura sob frente/centro/tras (suave; so cai de verdade em degrau grande)
-  let hs=0,hn=0;for(const o of [.15,0,-.15]){const h=W3.height(wx+fx*o,wz+fz*o,gy,.05);if(h!==null){hs+=h;hn++}}
+  let hs=0,hn=0;for(const o of [.075,0,-.075]){const h=W3.height(wx+fx*o,wz+fz*o,gy,.025);if(h!==null){hs+=h;hn++}}
   if(hn){const h=hs/hn;
-    if(h<gy-.25){vgy+=2.6*dt;gy=Math.max(h,gy-vgy*dt)}else{vgy=0;gy+=(h-gy)*Math.min(1,dt*14)}}
+    if(h<gy-.12){vgy+=1.3*dt;gy=Math.max(h,gy-vgy*dt)}else{vgy=0;gy+=(h-gy)*Math.min(1,dt*14)}}
   {const pl={x:wx,z:wz,hd,v:vf};Trafego.update(dt,t,pl);
    const k=Trafego.collide(pl);
    if(k.hit&&crashT<=0){const l=Math.hypot(k.dx,k.dz)||1,nx=k.dx/l,nz=k.dz/l;
-     if(!blocked(wx+nx*.03,wz+nz*.03)){wx+=nx*.03;wz+=nz*.03}
+     if(!blocked(wx+nx*.015,wz+nz*.015)){wx+=nx*.015;wz+=nz*.015}
      physKick(-clamp(k.rv*.7,3,14));crashT=.35;spd*=.55;vl*=.5;k.car.v*=.4}}
   // derrapagem visual: o carro aponta pra dentro da curva (mesmo sentido do slip do jogo)
   wslip=clamp(-vl/Math.max(Math.abs(vf),4)*2.6,-1,1);slip+=(wslip-slip)*Math.min(1,dt*12);
@@ -338,7 +338,7 @@ function update(dt){
   const sg=segAt(pos),pct=spd/MAXSPD;
   pos=(pos+dt*spd)%TRACK;
   const dx=dt*2*pct;
-  const inp=wheelOn?clamp(wAng/95,-1,1):key.r-key.l;
+  const inp=wheelOn?clamp(wAng/270,-1,1):key.r-key.l;
   steer+=(inp-steer)*Math.min(1,dt*(view==='cab'?4.5:7));
   // derrapagem: segurou a curva por muito tempo em velocidade -> o carro escorrega de lado (drift); soltar ou contra-esterçar recupera
   if(inp!==0){if(Math.sign(inp)===holdDir)holdT+=dt;else{holdDir=Math.sign(inp);holdT=0}}else holdT=Math.max(0,holdT-dt*3);
@@ -599,8 +599,8 @@ function drawWorld(){
   ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,0,W,H);
   if(W3.ready)W3.stream(wx,wz);
   if(!W3.ready||!wInit||!W3.tilesReady(wx,wz,8)){const pr=W3.ready?W3.progress():0;ctx.fillStyle='#8c93b8';ctx.font='10px monospace';ctx.fillText('carregando o mapa... '+Math.round(pr*100)+'%',W/2-70,H/2);ctx.fillStyle='#2a3050';ctx.fillRect(W/2-70,H/2+8,140,4);ctx.fillStyle='#8c93b8';ctx.fillRect(W/2-70,H/2+8,140*pr,4);return}
-  const fx=Math.sin(hd),fz=Math.cos(hd),eh=cabv?.095:.22,back=cabv?0:.6,ah=W3.height(wx+fx*1.4,wz+fz*1.4,gy,.1),pit=ah===null?0:clamp(ah-gy,-.15,.15);pitS+=(pit-pitS)*.05;
-  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*3,gy+eh-.003+pitS*1.6,wz+fz*3]:[wx+fx*1.5,gy+.12+pitS*1.1,wz+fz*1.5],fov:cabv?.95:.88,far:12};
+  const fx=Math.sin(hd),fz=Math.cos(hd),eh=cabv?.05:.11,back=cabv?0:.3,ah=W3.height(wx+fx*.7,wz+fz*.7,gy,.05),pit=ah===null?0:clamp(ah-gy,-.075,.075);pitS+=(pit-pitS)*.05;
+  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*1.5,gy+eh-.0015+pitS*.8,wz+fz*1.5]:[wx+fx*.75,gy+.06+pitS*.55,wz+fz*.75],fov:cabv?.95:.88,far:14};
   W3.dynBegin();Trafego.draw(W3,{x:wx,z:wz},t,gy);
   W3.render(cam,{p:[wx,gy,wz],fwd:[fx,fz],head:lightsOn?1:0},[HAZE[0]/255,HAZE[1]/255,HAZE[2]/255],[.62,.7,1.05],t);
   hzY=W3.project(cam,[cam.eye[0]+fx*500,cam.eye[1],cam.eye[2]+fz*500])[1];
@@ -723,8 +723,8 @@ function cabUpdate(dt){
   const ay=clamp(steer*pct*.9+slip*pct*.9+sg.curve*pct*pct*.25,-1.4,1.4);
   // volante: mola + amortecedor, 190 graus no total (+-95), contra-esterça no drift e treme com buracos/lombadas
   const act=clamp(pct*4,0,1);                          // parado: sem tremor nenhum
-  const tgt=clamp(steer*95-slip*38+act*((Math.random()-.5)*3*pct+clamp(BODY.hv,-4,4)*.5),-95,95);
-  for(let i=0;i<4;i++){const h=dt/4;wheelV+=(900*(tgt-wheelA)-45*wheelV)*h;wheelA=clamp(wheelA+wheelV*h,-95,95)}
+  const tgt=clamp(steer*270-slip*100+act*((Math.random()-.5)*6*pct+clamp(BODY.hv,-4,4)*1.2),-270,270);
+  for(let i=0;i<4;i++){const h=dt/4;wheelV+=(900*(tgt-wheelA)-45*wheelV)*h;wheelA=clamp(wheelA+wheelV*h,-270,270)}
   if(Math.abs(tgt)<.2&&Math.abs(wheelA)<.2&&Math.abs(wheelV)<2){wheelA=0;wheelV=0}
   // mao no cambio: vai ate a alavanca (suave), segura enquanto troca, volta ao volante
   shiftArm.t-=dt;hw+=((shiftArm.t>0?1:0)-hw)*Math.min(1,dt*9);

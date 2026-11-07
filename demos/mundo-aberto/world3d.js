@@ -26,7 +26,7 @@ varying vec2 vT;varying float vS;varying vec3 vW;varying float vD;
 void main(){vec3 t=texture2D(uTex,vT).rgb;if(t.r+t.g+t.b<.045)discard;
  vec3 col=t*vS*uTint;
  vec3 d=vW-uCar;float al=dot(d.xz,uFwd.xz);float ac=abs(d.x*uFwd.z-d.z*uFwd.x);
- float cone=uHead*step(0.,al)*smoothstep(2.4,.05,al)*smoothstep(.10+al*.34,0.,ac)*smoothstep(.55,.0,abs(d.y));
+ float cone=uHead*step(0.,al)*smoothstep(1.2,.025,al)*smoothstep(.05+al*.34,0.,ac)*smoothstep(.28,.0,abs(d.y));
  col+=t*vec3(1.15,1.02,.8)*cone*1.1;
  float lum=dot(t,vec3(.3,.59,.11));col+=t*smoothstep(.55,.9,lum)*.10;      /* janelas/placas claras brilham um pouco */
  float f=clamp((vD-uFogR.x)/(uFogR.y-uFogR.x),0.,1.);col=mix(col,uFog,f*f*(3.-2.*f));
@@ -49,7 +49,7 @@ img.src=MAP+'atlas.png';
 Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.wav').then(r=>r.arrayBuffer()),fetch(MAP+'obs.wav').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json())]).then(([cfg,g,ob,st])=>{
   W3.cfg=cfg;W3.grid=new Int16Array(g);W3.obsg=new Uint8Array(ob);W3.start=st;index=cfg.tiles;W3.ready=true}).catch(e=>{W3.error=String(e)});
 // altura do chao em camadas (pontes, rampas, tuneis). Retorna a camada mais alta que o carro alcanca (<= gy+degrau); null = parede/vazio
-W3.obs=function(x,z){const c=W3.cfg;if(!c)return false;const ix=Math.floor((x-c.x0)/c.OS),iz=Math.floor((z-c.z0)/c.OS);return ix>=0&&iz>=0&&ix<c.OW&&iz<c.OH&&W3.obsg[iz*c.OW+ix]===1};
+W3.obs=function(x,z){const c=W3.cfg;if(!c)return false;const ix=Math.floor((x-c.x0)/c.OS),iz=Math.floor((z-c.z0)/c.OS);return ix>=0&&iz>=0&&ix<c.OW&&iz<c.OH&&(W3.obsg[(iz*c.OW+ix)>>3]>>(7-((iz*c.OW+ix)&7))&1)===1};
 W3.height=function(x,z,gy,step){const c=W3.cfg;if(!c)return 0;const ix=Math.floor((x-c.x0)/c.CELL),iz=Math.floor((z-c.z0)/c.CELL);
   if(ix<0||iz<0||ix>=c.GW||iz>=c.GH)return null;const n=c.GW*c.GH,lim=(gy===undefined?9:gy)+(step===undefined?.14:step);let best=null;
   for(let l=0;l<c.LAY;l++){const v=W3.grid[l*n+iz*c.GW+ix];if(v===-32768)break;const h=v/1000;if(h<=lim&&(best===null||h>best))best=h}
@@ -77,7 +77,7 @@ W3.render=function(cam,car,fog,tint,time){
   stream(cam.eye[0],cam.eye[2]);
   gl.viewport(0,0,480,270);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   if(!tex)return;
-  const M=m4.mul(m4.persp(cam.fov,480/270,.02,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
+  const M=m4.mul(m4.persp(cam.fov,480/270,.005,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
   gl.uniformMatrix4fv(U.uM,false,M);gl.uniform3f(U.uCar,car.p[0],car.p[1],car.p[2]);gl.uniform3f(U.uFwd,car.fwd[0],0,car.fwd[1]);
   gl.uniform3f(U.uFog,fog[0],fog[1],fog[2]);gl.uniform3f(U.uTint,tint[0],tint[1],tint[2]);gl.uniform2f(U.uFogR,cam.far*.35,cam.far);gl.uniform1f(U.uHead,car.head);gl.uniform1f(U.uTime,time||0);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(U.uTex,0);
@@ -117,7 +117,7 @@ W3.box=function(cx,cy,cz,hl,hh,hw,hd,r,g,b,em){
 };
 W3.dynDraw=function(cam,fog,tint){
   if(!dn)return;
-  const M=m4.mul(m4.persp(cam.fov,480/270,.02,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
+  const M=m4.mul(m4.persp(cam.fov,480/270,.005,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
   gl.useProgram(pr2);gl.uniformMatrix4fv(U2.uM,false,M);gl.uniform3f(U2.uFog,fog[0],fog[1],fog[2]);gl.uniform3f(U2.uTint,tint[0],tint[1],tint[2]);gl.uniform2f(U2.uFogR,cam.far*.35,cam.far);
   gl.bindBuffer(gl.ARRAY_BUFFER,dynBuf);gl.bufferData(gl.ARRAY_BUFFER,dyn.subarray(0,dn*7),gl.DYNAMIC_DRAW);
   gl.disableVertexAttribArray(A.T);gl.disableVertexAttribArray(A.S);gl.disableVertexAttribArray(A.P);
@@ -127,7 +127,7 @@ W3.dynDraw=function(cam,fog,tint){
   gl.disableVertexAttribArray(A2.P);gl.disableVertexAttribArray(A2.C);gl.useProgram(pr);
 };
 // projeta um ponto do mundo para a tela 480x270 (para achar o horizonte)
-W3.project=function(cam,p){const M=m4.mul(m4.persp(cam.fov,480/270,.02,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
+W3.project=function(cam,p){const M=m4.mul(m4.persp(cam.fov,480/270,.005,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
   const x=M[0]*p[0]+M[4]*p[1]+M[8]*p[2]+M[12],y=M[1]*p[0]+M[5]*p[1]+M[9]*p[2]+M[13],w=M[3]*p[0]+M[7]*p[1]+M[11]*p[2]+M[15];
   return [(x/w*.5+.5)*480,(1-(y/w*.5+.5))*270,w]};
 })();
