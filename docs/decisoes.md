@@ -88,3 +88,13 @@
 - Qualidade adaptativa: desliga sombras / encurta distância / reduz carros se o FPS cair.
 - Trânsito: postes só na calçada, carros menores, cedência preditiva, rede de segurança (despawn de carro preso/sobreposto).
 - Limites conhecidos: ~15–25% dos carros encostam em quina; sobreposição residual no cruzamento complexo (x −79..−66, z 93..106); chuva ainda ligada por padrão ao meio-dia; tiles.json precisa regenerar TOP após rodar o conversor.
+
+## 08/11/2026 (noite) — v7: liberdade do jogador, muretas, buracos, a pé, minimapa
+- Jogador livre: removida a máscara de estrada da colisão do carro (só vale para o trânsito). Paredes agora = prédio/objeto real ou borda de viaduto (queda > ~2 m, `h < gy-.09`).
+- Muretas: ferramentas/mapa/preencher_buracos.py acha bordas de pistas elevadas (>= 5 células seguidas) e gera tiles estáticos f_*.wav (concreto, 1,2 m de altura). Rodar DEPOIS do conversor/máscara/heightfield.
+- Buracos: o mesmo script preenche chão vazio de baixo (rio, terrenos, faixa de ~100 m em volta do mapa) com grama no atlas (slot 63) e marca o grid como dirigível (.003).
+- Dia/noite automático: 24 h em ~16 min reais; relógio no HUD.
+- Trânsito: nasce proporcional ao comprimento das faixas (espalha), no máximo 2 carros por ~60 m; cada carro tem destino à frente e escolhe a conexão que o aproxima (menos giro no quarteirão).
+- A pé (tecla F / botão de pessoa): desce do carro parado (< 12 km/h), anda (seta/botão; N corre), volta ao carro perto dele. Boneco de blocos provisório; carro fica estacionado e o trânsito o enxerga.
+- Minimapa (tecla M / botão de pino): gira com o carro, ruas/grama/prédios, carros do trânsito em vermelho, carro estacionado em laranja; botão alterna 3 zoom e desliga.
+- Pendências: sprites dos NPCs (dele), túneis, postos, mapa mais longo (a combinar), prédios onde falta (a combinar).

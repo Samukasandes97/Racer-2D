@@ -90,17 +90,24 @@ function spawn(px,pz,phd,t){
   if(!lanes.length)return false;
   // sorteia faixa perto do jogador (anel 4..11 un), preferindo fora do campo de visao
   for(let tr=0;tr<20;tr++){
-    const l=lanes[(Math.random()*lanes.length)|0];if(l.len<.45)continue;
+    if(!lanes.cum){let a=0;lanes.cum=lanes.map(x=>a+=x.len)}let rr=Math.random()*lanes.cum[lanes.cum.length-1],lo=0,hi=lanes.cum.length-1;while(lo<hi){const m=(lo+hi)>>1;if(lanes.cum[m]<rr)lo=m+1;else hi=m}
+    const l=lanes[lo];if(l.len<.45)continue;
     const s=Math.random()*(l.len-.2)+.1,p=lanePoint(l,s),d=hyp(p[0]-px,p[1]-pz);
     if(d<3.5||d>10)continue;
     const ang=Math.atan2(p[0]-px,p[1]-pz);if(Math.abs(angd(ang,phd))<.7&&d<7)continue;      // nao nasce na cara do jogador
-    if(T.cars.some(c=>hyp(c.x-p[0],c.z-p[1])<.7))continue;
+    if(T.cars.some(c=>hyp(c.x-p[0],c.z-p[1])<.9))continue;
+    if(T.cars.reduce((n,c)=>n+(hyp(c.x-p[0],c.z-p[1])<2.5?1:0),0)>=2)continue;               // espalha: no maximo 2 carros por ~60 m ao redor
     const q=lanePoint(l,s+.03);const hd=Math.atan2(q[0]-p[0],q[1]-p[1]);
     const ty=pickType();
     T.cars.push({x:p[0],z:p[1],hd,v:l.lim*.45,lane:l,s,ty,col:PAL[(Math.random()*PAL.length)|0],v0f:.88+Math.random()*.17,brake:0,next:null,stuck:0,id:Math.random()});
     return true}
   return false}
+function newGoal(c){const a=c.hd+(Math.random()-.5)*1.6,d=5+Math.random()*6;c.goal=[c.x+Math.sin(a)*d,c.z+Math.cos(a)*d];c.goalT=40+Math.random()*50}
 function chooseNext(c){const l=c.lane;if(l.isConn)return l.to;const opts=l.conns||[];if(!opts.length)return null;
+  if(!c.goal||hyp(c.x-c.goal[0],c.z-c.goal[1])<1.5||c.goalT<=0||((c.goal[0]-c.x)*Math.sin(c.hd)+(c.goal[1]-c.z)*Math.cos(c.hd))<0)newGoal(c);
+  if(opts.length>1){let best=null,bs=1e9;for(const o of opts){const e=o.to&&o.to.pts?o.to.pts[o.to.pts.length-1]:(o.pts?o.pts[o.pts.length-1]:null);if(!e){continue}
+      const sc=hyp(e[0]-c.goal[0],e[1]-c.goal[1])+Math.random()*1.2;if(sc<bs){bs=sc;best=o}}
+    if(best)return best}
   let tot=0;const w=opts.map(o=>{const k=Math.abs(o.turn)<.5?3:.9;tot+=k;return k});
   let r=Math.random()*tot;for(let i=0;i<opts.length;i++){if((r-=w[i])<0)return opts[i]}return opts[0]}
 T.update=function(dt,t,pl){            // pl: {x,z,hd,v(m/s)}
@@ -113,7 +120,7 @@ T.update=function(dt,t,pl){            // pl: {x,z,hd,v(m/s)}
     const hc=W3.height(c.x,c.z,0,.06);c.bad=(hc===null||W3.obs(c.x,c.z))?(c.bad||0)+dt:0;
     let ov=false;if(c.uid)for(const o of cars){if(o!==c&&o.uid&&o.uid<c.uid&&hyp(o.x-c.x,o.z-c.z)<.1){ov=true;break}}c.ovT=ov?(c.ovT||0)+dt:0;
     if(hyp(c.x-pl.x,c.z-pl.z)>11.5||c.stuck>25||c.bad>.6||c.ovT>.5)cars.splice(i,1)}
-  for(const c of cars){
+  for(const c of cars){if(c.goalT>0)c.goalT-=dt;
     const l=c.lane,f=[Math.sin(c.hd),Math.cos(c.hd)],r=[-f[1],f[0]];
     // --- quem esta a frente (carros e jogador) ---
     let gap=1e9,vl=0;
@@ -178,7 +185,7 @@ T.collide=function(pl){const out={hit:false};
 T.prepare=function(W3){if(!T.ready&&T.loaded&&W3.ready)validate(W3)};
 T.draw=function(W3,pl,t,gy){
   const R=10;
-  for(const c of T.cars){
+  for(const c of (T.extra?T.cars.concat([T.extra]):T.cars)){
     if(hyp(c.x-pl.x,c.z-pl.z)>R)continue;
     const h=W3.height(c.x,c.z,gy+.025,.06);const y=h===null?gy:h;const ty=c.ty,hl=ty.L/2,w=ty.w/2,hd=c.hd,cl=.014;
     const [r,g,b]=c.col,s=Math.sin(hd),co=Math.cos(hd);
@@ -207,5 +214,5 @@ T.draw=function(W3,pl,t,gy){
         const lamp=(k,col,on)=>W3.box(px-d[0]*.0105,y+.2+k*.017,pz-d[1]*.0105,.0035,.0065,.0065,hd,col[0]*(on?1:.18),col[1]*(on?1:.18),col[2]*(on?1:.18),on?1:0);
         lamp(1,[1,.1,.1],st==='R');lamp(0,[1,.8,.05],st==='Y');lamp(-1,[.1,1,.25],st==='G')}}}
 };
-T.max=30;
+T.max=30;T.TYPES=TYPES;
 })();
