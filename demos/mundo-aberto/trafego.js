@@ -58,11 +58,11 @@ function validate(W3){
       const od=[o.pts[1][0]-o.pts[0][0],o.pts[1][1]-o.pts[0][1]],ol=hyp(od[0],od[1])||1;od[0]/=ol;od[1]/=ol;
       const dif=angd(Math.atan2(od[0],od[1]),Math.atan2(l.dir[0],l.dir[1]));
       if(dif>.5&&n.in.some(i=>i!==l&&i.dir[0]*l.dir[0]+i.dir[1]*l.dir[1]<-.7))continue;
-      const P0=l.pts[l.pts.length-1],P3=o.pts[0],dd=hyp(P3[0]-P0[0],P3[1]-P0[1]),k=Math.max(.01,dd*.4);
+      const P0=l.pts[l.pts.length-1],P3=o.pts[0],dd=hyp(P3[0]-P0[0],P3[1]-P0[1]),k=Math.max(.04,dd*.45);
       const P1=[P0[0]+l.dir[0]*k,P0[1]+l.dir[1]*k],P2=[P3[0]-od[0]*k,P3[1]-od[1]*k],pts=[];
       for(let i=0;i<=8;i++){const u=i/8,v=1-u;pts.push([v*v*v*P0[0]+3*v*v*u*P1[0]+3*v*u*u*P2[0]+u*u*u*P3[0],v*v*v*P0[1]+3*v*v*u*P1[1]+3*v*u*u*P2[1]+u*u*u*P3[1]])}
       const cm=[0];for(let i=1;i<pts.length;i++)cm.push(cm[i-1]+hyp(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
-      const cn={pts,cum:cm,len:cm[cm.length-1],isConn:true,to:o,from:l,turn:dif,lim:Math.abs(dif)<.5?l.lim:(dif>0?6:5),cls:l.cls,dir:od,a:n.i,b:n.i,grp:l.grp,id:-1-conns.length,off:l.off};
+      const cn={pts,cum:cm,len:cm[cm.length-1],isConn:true,to:o,from:l,turn:dif,lim:Math.abs(dif)<.5?(dd>.07?Math.min(l.lim,5.5):l.lim):(dif>0?6:5),cls:l.cls,dir:od,a:n.i,b:n.i,grp:l.grp,id:-1-conns.length,off:l.off};
       nc++;if(cn.len>.01&&laneClear(W3,cn)>0){ncBad++;continue}
       l.conns.push(cn);conns.push(cn)}}}
   T.conns=conns;
@@ -84,7 +84,7 @@ function project(l,x,z,hint){let best=1e9,bs=0;const p=l.pts,c=l.cum;
   return [bs,best]}
 const angd=(a,b)=>{let d=a-b;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return d};
 // ---------- carros ----------
-const TYPES=[{L:.18,H:.03,cab:.09,cabH:.022,cabOff:-.015,w:.074,p:3},{L:.15,H:.03,cab:.095,cabH:.022,cabOff:-.02,w:.072,p:2},{L:.21,H:.045,cab:.17,cabH:.026,cabOff:-.01,w:.08,p:1}];
+const TYPES=[{L:.16,H:.026,cab:.08,cabH:.02,cabOff:-.013,w:.066,p:3},{L:.135,H:.026,cab:.085,cabH:.02,cabOff:-.018,w:.064,p:2},{L:.19,H:.04,cab:.15,cabH:.024,cabOff:-.01,w:.072,p:1}];
 function pickType(){let r=Math.random()*6;for(const t of TYPES){if((r-=t.p)<0)return t}return TYPES[0]}
 function spawn(px,pz,phd,t){
   if(!lanes.length)return false;
@@ -107,7 +107,12 @@ T.update=function(dt,t,pl){            // pl: {x,z,hd,v(m/s)}
   if(!T.ready)return;dt=Math.min(dt,.05);
   const cars=T.cars;
   if(cars.length<T.max&&Math.random()<dt*4)spawn(pl.x,pl.z,pl.hd,t);
-  for(let i=cars.length-1;i>=0;i--){const c=cars[i];if(hyp(c.x-pl.x,c.z-pl.z)>11.5||c.stuck>25)cars.splice(i,1)}
+  const W3=World3D;
+  for(let i=cars.length-1;i>=0;i--){const c=cars[i];
+    // rede de seguranca: carro dentro de parede/obstaculo por >1 s, ou sobreposto a outro por >1,5 s, e' removido (nao fica bug visivel)
+    const hc=W3.height(c.x,c.z,0,.06);c.bad=(hc===null||W3.obs(c.x,c.z))?(c.bad||0)+dt:0;
+    let ov=false;if(c.uid)for(const o of cars){if(o!==c&&o.uid&&o.uid<c.uid&&hyp(o.x-c.x,o.z-c.z)<.1){ov=true;break}}c.ovT=ov?(c.ovT||0)+dt:0;
+    if(hyp(c.x-pl.x,c.z-pl.z)>11.5||c.stuck>25||c.bad>.6||c.ovT>.5)cars.splice(i,1)}
   for(const c of cars){
     const l=c.lane,f=[Math.sin(c.hd),Math.cos(c.hd)],r=[-f[1],f[0]];
     // --- quem esta a frente (carros e jogador) ---
@@ -115,6 +120,13 @@ T.update=function(dt,t,pl){            // pl: {x,z,hd,v(m/s)}
     const consider=(ox,oz,ov,ohd)=>{const dx=ox-c.x,dz=oz-c.z,a=dx*f[0]+dz*f[1];if(a<=0||a>1.4)return;const lat=Math.abs(dx*r[0]+dz*r[1]);
       if(lat>.06)return;const cs=Math.sin(ohd)*f[0]+Math.cos(ohd)*f[1];if(cs<.3)return;const g=a-.18;if(g<gap){gap=g;vl=ov*cs}};
     for(const o of cars)if(o!==c)consider(o.x,o.z,o.v,o.hd);
+    // conflito previsto (cruzamentos): se o caminho de outro carro cruza o meu em ate 1,4 s, o mais novo cede
+    if(!c.uid)c.uid=(T._n=(T._n||0)+1);
+    if(c.stuck<5)for(const o of cars){if(o===c||!o.uid||o.uid>c.uid)continue;const rx=o.x-c.x,rz=o.z-c.z,d0=Math.hypot(rx,rz);if(d0>.7||d0<.001)continue;
+      if(rx*f[0]+rz*f[1]<-.04)continue;                                       // quem esta atras de mim nao me interessa
+      const vx=(Math.sin(o.hd)*o.v-f[0]*c.v)/MPU,vz=(Math.cos(o.hd)*o.v-f[1]*c.v)/MPU,vv=vx*vx+vz*vz;
+      const tau=vv>1e-6?Math.max(0,Math.min(1.4,-(rx*vx+rz*vz)/vv)):0;const dm=Math.hypot(rx+vx*tau,rz+vz*tau);
+      if(dm<.13){const g=d0-.17;if(g<gap){gap=Math.max(g,0);vl=Math.min(vl,o.v*.5)}}}
     // lider pela propria faixa (e pela proxima/conexao): mesmo com pequeno desvio lateral, quem esta na frente na rota conta
     {const nl0=c.next||(c.next=chooseNext(c));const L0=l.len-c.s;
      for(const o of cars){if(o===c)continue;let dd=-1;
@@ -147,7 +159,7 @@ T.update=function(dt,t,pl){            // pl: {x,z,hd,v(m/s)}
     const look=Math.max(.08,c.v/MPU*.45+.05);
     let tp,ds=c.s+look;
     if(ds>l.len&&nl){const rest=ds-l.len;tp=lanePoint(nl,Math.min(nl.len,rest+.02))}else tp=lanePoint(l,ds);
-    const want=Math.atan2(tp[0]-c.x,tp[1]-c.z);let dh=angd(want,c.hd);const maxr=Math.max(.6,c.v/2.7*Math.tan(.55));
+    const want=Math.atan2(tp[0]-c.x,tp[1]-c.z);let dh=angd(want,c.hd);c.hd=angd(c.hd,0);const maxr=Math.max(.6,c.v/2.7*Math.tan(.55));
     c.hd+=Math.max(-maxr*dt,Math.min(maxr*dt,dh));
     c.x+=Math.sin(c.hd)*c.v/MPU*dt;c.z+=Math.cos(c.hd)*c.v/MPU*dt;
     if(c.s>=l.len-.02&&nl){c.lane=nl;c.s=project(nl,c.x,c.z)[0];c.next=null}
@@ -185,10 +197,9 @@ T.draw=function(W3,pl,t,gy){
   for(let i=-rr;i<=rr;i++)for(let j=-rr;j<=rr;j++){const arr=grid.get((gx+i)+','+(gz+j));if(!arr)continue;
     for(const n of arr){if(!T.hasLight(n)||hyp(n.x-pl.x,n.z-pl.z)>R+.5)continue;
       for(const l of n.in){const d=l.dir,rt=[-d[1],d[0]],st=T.light(n,l.grp,t);
-        if(!l.pole){let lat=(l.off||.12)+.2,ok=false;                                           // acha um lugar livre perto da calcada
-          for(const k of [1,.85,.7,.55,1.2]){const px=n.x-d[0]*l.stop+rt[0]*lat*k,pz=n.z-d[1]*l.stop+rt[1]*lat*k;
-            if(W3.height(px,pz,0,.1)!==null&&!W3.obs(px,pz)){l.pole=[px,pz];ok=true;break}}
-          if(!ok)l.pole=[n.x-d[0]*l.stop+rt[0]*(l.off||.12)*1.5,n.z-d[1]*l.stop+rt[1]*(l.off||.12)*1.5]}
+        if(!l.pole){const bx=n.x-d[0]*l.stop,bz=n.z-d[1]*l.stop;let last=(l.off||.12)+.08;     // anda para a direita ate a borda da rua e coloca o poste na calcada
+          for(let k=(l.off||.12)+.1;k<.9;k+=.02){const px=bx+rt[0]*k,pz=bz+rt[1]*k;if(W3.height(px,pz,0,.1)===null||W3.obs(px,pz)||!W3.road(px,pz))break;last=k}
+          l.pole=[bx+rt[0]*last,bz+rt[1]*last]}
         const [px,pz]=l.pole,hh=W3.height(px,pz,gy+.2,.2),y=hh===null?gy:hh;
         W3.box(px,y+.09,pz,.003,.09,.003,0,.16,.16,.17,0);                                       // poste ~4,3 m
         const hd=Math.atan2(-d[0],-d[1]);                                                         // cabeca olha para quem chega

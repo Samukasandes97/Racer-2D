@@ -79,3 +79,12 @@
 - Trânsito: faixas validadas contra paredes/obstáculos/degraus (faixa que não passa no teste é descartada ou aproximada do centro), conexões em curva dentro dos cruzamentos (sem esquerda cruzando fluxo contrário), sem retorno em beco, carros param no fim de rua sem saída, cruzamentos vizinhos compartilham o ciclo do semáforo (verde 11 s / amarelo 3 s / 4 s tudo vermelho), semáforo na calçada (~4,3 m), carros do tamanho real.
 - Teste automático (Playwright, sem renderizar): 3 min de trânsito simulado + 100 percursos do jogador pelas faixas. Resultado final: ~1 em 100 percursos com toque; carros dentro de parede ~1,7% das amostras (encostão de quina), sobreposição entre carros ~0,04%.
 - Ferramentas: extrair_vias.py agora endireita ruas (corda ≤ 0,12) e usa parâmetros em células na nova escala.
+
+## 08/11/2026 — iluminação, colisão com rebote, máscara de estrada, trânsito (v6)
+- Colisão: batida agora rebate (BOUNCE .6) e o carro volta pra trás em vez de agarrar; degrau de subida .035 (rampas mais suaves); máscara de estrada (mapa/road.wav, gerada por ferramentas/mapa/mascara_estrada.py) impede entrar onde não há rua.
+- Camadas de altura (3) mantidas como chão do carro; queda em rampa não foi reproduzida em teste, só mitigada.
+- Luzes do carro: painel (I), teto (O), faróis/lanternas (T), todas liga/desliga por botão e tecla.
+- Dia/noite: sol em arco leste→meio→oeste, lua à noite, céu/neblina por hora, janelas acesas à noite, sombras por heightfield (mapa/top.wav, ferramentas/mapa/heightfield_sombra.py; aproximadas, respeitam área iluminada/sombra).
+- Qualidade adaptativa: desliga sombras / encurta distância / reduz carros se o FPS cair.
+- Trânsito: postes só na calçada, carros menores, cedência preditiva, rede de segurança (despawn de carro preso/sobreposto).
+- Limites conhecidos: ~15–25% dos carros encostam em quina; sobreposição residual no cruzamento complexo (x −79..−66, z 93..106); chuva ainda ligada por padrão ao meio-dia; tiles.json precisa regenerar TOP após rodar o conversor.

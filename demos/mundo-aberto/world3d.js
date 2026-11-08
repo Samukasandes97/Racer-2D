@@ -21,14 +21,28 @@ const m4={
 // ---------- shader ----------
 const VS=`attribute vec3 aP;attribute vec2 aT;attribute float aS;uniform mat4 uM;uniform vec3 uMn,uExt;varying vec2 vT;varying float vS;varying vec3 vW;varying float vD;
 void main(){vec3 p=uMn+aP*uExt;vec4 c=uM*vec4(p,1.);gl_Position=c;vT=aT;vS=aS;vW=p;vD=c.w;}`;
-const FS=`precision highp float;uniform sampler2D uTex;uniform vec3 uCar,uFwd,uFog,uTint;uniform vec2 uFogR;uniform float uHead,uTime;
+const DER=gl.getExtension('OES_standard_derivatives');
+const FS=(DER?'#extension GL_OES_standard_derivatives : enable\n':'')+`precision highp float;uniform sampler2D uTex,uTop;uniform vec3 uCar,uFwd,uFog,uTint,uEye,uSunD,uSunC;uniform vec2 uFogR;uniform vec4 uTopP;uniform vec2 uTopY;uniform float uHead,uTime,uNight,uHasTop;
 varying vec2 vT;varying float vS;varying vec3 vW;varying float vD;
 void main(){vec3 t=texture2D(uTex,vT).rgb;if(t.r+t.g+t.b<.045)discard;
- vec3 col=t*vS*uTint;
+ vec3 n=vec3(0.,1.,0.);
+ #ifdef GL_OES_standard_derivatives
+ n=normalize(cross(dFdx(vW),dFdy(vW)));if(dot(n,uEye-vW)<0.)n=-n;
+ #endif
+ float nd=max(dot(n,uSunD),0.);float sh=1.;
+ if(nd>.001&&uHasTop>.5&&(uSunC.r+uSunC.g+uSunC.b)>.03){
+  vec3 p=vW+n*.12;float s=.07;
+  for(int k=0;k<14;k++){p+=uSunD*s;s*=1.38;vec2 tc=(p.xz-uTopP.xy)*uTopP.zw;float h=texture2D(uTop,tc).r*uTopY.y+uTopY.x;if(h>p.y+.02){sh=0.;break;}}}
+ vec3 col=t*vS*(uTint+uSunC*nd*sh);
  vec3 d=vW-uCar;float al=dot(d.xz,uFwd.xz);float ac=abs(d.x*uFwd.z-d.z*uFwd.x);
  float cone=uHead*step(0.,al)*smoothstep(1.2,.025,al)*smoothstep(.05+al*.34,0.,ac)*smoothstep(.28,.0,abs(d.y));
  col+=t*vec3(1.15,1.02,.8)*cone*1.1;
- float lum=dot(t,vec3(.3,.59,.11));col+=t*smoothstep(.55,.9,lum)*.10;      /* janelas/placas claras brilham um pouco */
+ float lum=dot(t,vec3(.3,.59,.11));col+=t*smoothstep(.55,.9,lum)*.10*(.4+.6*uNight);
+ /* janelas dos predios acesas a noite (parede, textura escura/azulada, sorteio por janela) */
+ float wall=1.-abs(n.y);vec2 g=floor(vec2(vW.x+vW.z,vW.y)*vec2(16.,9.));
+ float hh=fract(sin(dot(g,vec2(12.9898,78.233)))*43758.5453);
+ float win=step(.6,hh)*smoothstep(.55,.9,wall)*smoothstep(.05,.12,vW.y-uCar.y+.04)*(1.-smoothstep(.3,.5,lum))*step(t.r*.85,t.b+.05);
+ col+=vec3(1.,.78,.42)*win*uNight*.9;
  float f=clamp((vD-uFogR.x)/(uFogR.y-uFogR.x),0.,1.);col=mix(col,uFog,f*f*(3.-2.*f));
  gl_FragColor=vec4(col,1.);}`;
 function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o}
@@ -36,7 +50,7 @@ const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attac
 if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){W3.error=gl.getProgramInfoLog(pr);return}
 gl.useProgram(pr);
 const A={P:gl.getAttribLocation(pr,'aP'),T:gl.getAttribLocation(pr,'aT'),S:gl.getAttribLocation(pr,'aS')};
-const U={};['uM','uMn','uExt','uTex','uCar','uFwd','uFog','uTint','uFogR','uHead','uTime'].forEach(n=>U[n]=gl.getUniformLocation(pr,n));
+const U={};['uM','uMn','uExt','uTex','uTop','uEye','uSunD','uSunC','uTopP','uTopY','uNight','uHasTop','uCar','uFwd','uFog','uTint','uFogR','uHead','uTime'].forEach(n=>U[n]=gl.getUniformLocation(pr,n));
 gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
 const idxExt=gl.getExtension('OES_element_index_uint');
 // ---------- dados ----------
@@ -46,9 +60,14 @@ const img=new Image();img.onload=()=>{tex=gl.createTexture();gl.bindTexture(gl.T
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)};
 img.src=MAP+'atlas.png';
-Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.wav').then(r=>r.arrayBuffer()),fetch(MAP+'obs.wav').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json())]).then(([cfg,g,ob,st])=>{
-  W3.cfg=cfg;W3.grid=new Int16Array(g);W3.obsg=new Uint8Array(ob);W3.start=st;index=cfg.tiles;W3.ready=true}).catch(e=>{W3.error=String(e)});
+W3.light={d:[0,1,0],c:[0,0,0],night:1};W3.shadows=true;let topTex=null;
+Promise.all([fetch(MAP+'tiles.json').then(r=>r.json()),fetch(MAP+'grid.wav').then(r=>r.arrayBuffer()),fetch(MAP+'obs.wav').then(r=>r.arrayBuffer()),fetch(MAP+'start.json').then(r=>r.json()),fetch(MAP+'road.wav').then(r=>r.arrayBuffer()),fetch(MAP+'top.wav').then(r=>r.arrayBuffer())]).then(([cfg,g,ob,st,rd,tp])=>{
+  topTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,topTex);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.LUMINANCE,cfg.GW,cfg.GH,0,gl.LUMINANCE,gl.UNSIGNED_BYTE,new Uint8Array(tp));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  W3.cfg=cfg;W3.grid=new Int16Array(g);W3.obsg=new Uint8Array(ob);W3.roadg=new Uint8Array(rd);W3.start=st;index=cfg.tiles;W3.ready=true}).catch(e=>{W3.error=String(e)});
 // altura do chao em camadas (pontes, rampas, tuneis). Retorna a camada mais alta que o carro alcanca (<= gy+degrau); null = parede/vazio
+// area dirigivel (ruas + rampas); fora disso (praca, parque, terreno) e' barreira
+W3.road=function(x,z){const c=W3.cfg;if(!c)return true;const i=Math.floor((x-c.x0)/c.CELL),j=Math.floor((z-c.z0)/c.CELL);if(i<0||j<0||i>=c.GW||j>=c.GH)return false;const k=j*c.GW+i;return(W3.roadg[k>>3]>>(7-(k&7))&1)===1};
 W3.obs=function(x,z){const c=W3.cfg;if(!c)return false;const ix=Math.floor((x-c.x0)/c.OS),iz=Math.floor((z-c.z0)/c.OS);return ix>=0&&iz>=0&&ix<c.OW&&iz<c.OH&&(W3.obsg[(iz*c.OW+ix)>>3]>>(7-((iz*c.OW+ix)&7))&1)===1};
 W3.height=function(x,z,gy,step){const c=W3.cfg;if(!c)return 0;const ix=Math.floor((x-c.x0)/c.CELL),iz=Math.floor((z-c.z0)/c.CELL);
   if(ix<0||iz<0||ix>=c.GW||iz>=c.GH)return null;const n=c.GW*c.GH,lim=(gy===undefined?9:gy)+(step===undefined?.14:step);let best=null;
@@ -80,7 +99,10 @@ W3.render=function(cam,car,fog,tint,time){
   const M=m4.mul(m4.persp(cam.fov,480/270,.005,cam.far),m4.look(cam.eye,cam.at,[0,1,0]));
   gl.uniformMatrix4fv(U.uM,false,M);gl.uniform3f(U.uCar,car.p[0],car.p[1],car.p[2]);gl.uniform3f(U.uFwd,car.fwd[0],0,car.fwd[1]);
   gl.uniform3f(U.uFog,fog[0],fog[1],fog[2]);gl.uniform3f(U.uTint,tint[0],tint[1],tint[2]);gl.uniform2f(U.uFogR,cam.far*.35,cam.far);gl.uniform1f(U.uHead,car.head);gl.uniform1f(U.uTime,time||0);
+  const LT=W3.light,c0=W3.cfg;gl.uniform3f(U.uEye,cam.eye[0],cam.eye[1],cam.eye[2]);gl.uniform3f(U.uSunD,LT.d[0],LT.d[1],LT.d[2]);gl.uniform3f(U.uSunC,LT.c[0],LT.c[1],LT.c[2]);gl.uniform1f(U.uNight,LT.night);
+  gl.uniform1f(U.uHasTop,topTex&&W3.shadows?1:0);if(c0&&c0.TOP){gl.uniform4f(U.uTopP,c0.x0,c0.z0,1/(c0.GW*c0.CELL),1/(c0.GH*c0.CELL));gl.uniform2f(U.uTopY,c0.TOP.ymin,c0.TOP.ymax-c0.TOP.ymin)}
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(U.uTex,0);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,topTex||tex);gl.uniform1i(U.uTop,1);gl.activeTexture(gl.TEXTURE0);
   gl.enableVertexAttribArray(A.P);gl.enableVertexAttribArray(A.T);gl.enableVertexAttribArray(A.S);
   const fx=cam.at[0]-cam.eye[0],fy=cam.at[1]-cam.eye[1],fz=cam.at[2]-cam.eye[2],fl=Math.hypot(fx,fy,fz);
   for(const o of tiles.values()){
@@ -91,7 +113,7 @@ W3.render=function(cam,car,fog,tint,time){
     gl.bindBuffer(gl.ARRAY_BUFFER,o.bu);gl.vertexAttribPointer(A.T,2,gl.UNSIGNED_SHORT,true,0,0);
     gl.bindBuffer(gl.ARRAY_BUFFER,o.bs);gl.vertexAttribPointer(A.S,1,gl.UNSIGNED_BYTE,true,0,0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,o.bi);gl.drawElements(gl.TRIANGLES,o.n,gl.UNSIGNED_SHORT,0)}
-  W3.dynDraw(cam,fog,tint);
+  W3.dynDraw(cam,fog,[tint[0]+LT.c[0]*.7,tint[1]+LT.c[1]*.7,tint[2]+LT.c[2]*.7]);
 };
 
 // ---------- geometria dinamica (carros do trânsito, semáforos): caixas coloridas desenhadas junto do mapa ----------
