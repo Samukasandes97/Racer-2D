@@ -105,3 +105,5 @@
 - Pendente desta rodada: carro em alta resolucao (rig-hires), zoom mais proximo, cores mais vivas/brilho, trecho de expansao do mapa, prompts de sprites.
 - Carro HD (09/11): camada nitida (#c2, 3x) por cima do canvas pixelado, montada com as camadas rig-hires dele (gerar_rig_hd.py: vidros semitransparentes por mascara de cor, tinta mais viva, brilho de verniz). Roda girando, suspensao e luzes de freio/seta/farol mantidas. Originais intactos. Reflexo e sombra continuam no rig pequeno.
 - Camera mais perto (fov .88 -> .78, carro com o mesmo tamanho de tela). Pos-processamento mais vivo: 16 niveis, saturacao 1.32, contraste 1.1.
+- Rodovia nova (09/11): ferramentas/mapa/rodovia.py (rodar por ultimo no pipeline) acrescenta 120 unidades (~2,9 km) ao fim do mapa: pista dupla com canteiro e guard-rails, 2 curvas, tunel (z+66..88), posto de gasolina (lado direito, z+45..62), postes, 260 arvores, placas, barreira no fim. Estende grid (dividido em grid.wav + grid2.wav por limite de 15 MB), obs, road, top; novos tiles r_*.wav; novos nos/arestas em vias.json (transito sobe a rodovia).
+- Camera ainda mais perto (fov .68, distancia .22).

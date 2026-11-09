@@ -745,8 +745,8 @@ function drawWorld(){
   ctx.fillStyle='rgb('+HAZE+')';ctx.fillRect(0,0,W,H);
   if(W3.ready)W3.stream(wx,wz);
   if(!W3.ready||!wInit||!W3.tilesReady(wx,wz,8)){const pr=W3.ready?W3.progress():0;ctx.fillStyle='#8c93b8';ctx.font='10px monospace';ctx.fillText('carregando o mapa... '+Math.round(pr*100)+'%',W/2-70,H/2);ctx.fillStyle='#2a3050';ctx.fillRect(W/2-70,H/2+8,140,4);ctx.fillStyle='#8c93b8';ctx.fillRect(W/2-70,H/2+8,140*pr,4);return}
-  const fx=Math.sin(hd),fz=Math.cos(hd),eh=foot?.095:cabv?.05:.11,back=foot?.2:cabv?0:.3,ah=W3.height(wx+fx*.7,wz+fz*.7,gy,.05),pit=ah===null?0:clamp(ah-gy,-.075,.075);pitS+=(pit-pitS)*.05;
-  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*1.5,gy+eh-.0015+pitS*.8,wz+fz*1.5]:foot?[wx+fx*.6,gy+.05+pitS*.3,wz+fz*.6]:[wx+fx*.75,gy+.06+pitS*.55,wz+fz*.75],fov:cabv?.95:.78,far:WFAR};
+  const fx=Math.sin(hd),fz=Math.cos(hd),eh=foot?.095:cabv?.05:.1,back=foot?.2:cabv?0:.22,ah=W3.height(wx+fx*.7,wz+fz*.7,gy,.05),pit=ah===null?0:clamp(ah-gy,-.075,.075);pitS+=(pit-pitS)*.05;
+  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*1.5,gy+eh-.0015+pitS*.8,wz+fz*1.5]:foot?[wx+fx*.6,gy+.05+pitS*.3,wz+fz*.6]:[wx+fx*.75,gy+.06+pitS*.55,wz+fz*.75],fov:cabv?.95:.68,far:WFAR};
   W3.dynBegin();Trafego.draw(W3,{x:wx,z:wz},t,gy);if(foot)drawActor();
   W3.light={d:TOD.d,c:TOD.sunC,night};
   W3.render(cam,{p:[wx,gy,wz],fwd:[fx,fz],head:lightsOn&&!foot?.08+.92*night:0},[HAZE[0]/255,HAZE[1]/255,HAZE[2]/255],TOD.amb,t);
