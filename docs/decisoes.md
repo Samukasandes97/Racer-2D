@@ -103,3 +103,5 @@
 - Causa dos "buracos/vazios": (1) 79 faces de chao usavam paginas de textura 128/158 que nao existem no zip do mapa (ficavam cinza); (2) ~48 mil vertices de chao usavam o texel azul-acinzentado criado para telhados (retangulos cinza em pracas).
 - Correcao: ferramentas/mapa/corrigir_texturas.py (rodar depois de preencher_buracos.py) remapeia essas faces para concreto/grama ja existentes no atlas. Nenhuma imagem original foi alterada.
 - Pendente desta rodada: carro em alta resolucao (rig-hires), zoom mais proximo, cores mais vivas/brilho, trecho de expansao do mapa, prompts de sprites.
+- Carro HD (09/11): camada nitida (#c2, 3x) por cima do canvas pixelado, montada com as camadas rig-hires dele (gerar_rig_hd.py: vidros semitransparentes por mascara de cor, tinta mais viva, brilho de verniz). Roda girando, suspensao e luzes de freio/seta/farol mantidas. Originais intactos. Reflexo e sombra continuam no rig pequeno.
+- Camera mais perto (fov .88 -> .78, carro com o mesmo tamanho de tela). Pos-processamento mais vivo: 16 niveis, saturacao 1.32, contraste 1.1.

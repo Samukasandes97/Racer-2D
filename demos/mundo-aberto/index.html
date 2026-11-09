@@ -7,6 +7,7 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;overflow:hidden;overscroll-behavior:none}
 .app{height:100dvh;display:flex;flex-direction:column;gap:8px;padding:6px max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
 .stage{position:relative;flex:0 0 auto;width:100%;aspect-ratio:16/9;max-height:46dvh;margin:0 auto;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0a0f24;touch-action:none;user-select:none;-webkit-user-select:none}
+#c2{position:absolute;left:0;top:0;image-rendering:auto;pointer-events:none}
 canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .hud{position:absolute;right:8px;top:6px;font-family:ui-monospace,monospace;font-size:clamp(11px,3vw,17px);text-shadow:0 0 6px var(--neon);font-variant-numeric:tabular-nums;text-align:right;pointer-events:none}
 .hud small{color:var(--muted);font-size:.7em;margin-left:3px}
@@ -48,6 +49,7 @@ button:active,button.on{background:var(--neon);border-color:var(--neon);color:#1
 <div class="app wh" id="app">
   <div class="stage" id="stage">
     <canvas id="c" aria-label="Carro laranja correndo numa rua de Shibuya à noite, na chuva"></canvas>
+    <canvas id="c2" aria-hidden="true"></canvas>
     <div class="hud" id="hud">0<small>km/h</small></div>
     <div class="msg" id="msg">teclado: setas/WASD · Espaço freio de mão · N nitro · E/Z marcha · C câmera</div>
   </div>
@@ -189,7 +191,54 @@ function drawRig(k){
     wheelScr[k+nm]={x:ox+r.x+r.w/2,y:oy+r.y+r.h-zy};
   }
   cg.save();bodyT();cg.drawImage(R.body,0,0);cg.restore();
-  return {ox,oy,w:m.w,h:m.h,up};
+  return {ox,oy,w:m.w,h:m.h,up,ang};
+}
+
+// ---------- carro em ALTA resolucao (camada nitida por cima do canvas pixelado; arte do Samuel, derivada por ferramentas/arte2d/gerar_rig_hd.py) ----------
+const OVS=3,c2=document.getElementById('c2');c2.width=W*OVS;c2.height=H*OVS;const o2=c2.getContext('2d');
+const HD={};let hdReady=false;
+fetch('img/rig-hd/rig.json').then(r=>r.json()).then(meta=>{
+  const jobs=[];
+  for(const k in meta){const m=meta[k],o={m,body:new Image(),well:new Image(),wh:{}};HD[k]=o;
+    const load=(im,src)=>jobs.push(new Promise(ok=>{im.onload=ok;im.onerror=ok;im.src=src}));
+    load(o.body,'img/rig-hd/'+k+'_body.png');load(o.well,'img/rig-hd/'+k+'_well.png');
+    for(const r of m.rodas){const w={r,img:new Image(),face:null,tc:document.createElement('canvas')};o.wh[r.nome]=w;load(w.img,'img/rig-hd/'+k+'_wheel_'+r.nome+'.png');
+      if(r.face){w.face=new Image();load(w.face,'img/rig-hd/'+k+'_face_'+r.nome+'.png')}}}
+  Promise.all(jobs).then(()=>{hdReady=true});
+}).catch(()=>{});
+function hdTread(w,ph,x,y){            // banda de rodagem rolando (vista traseira), em alta resolucao
+  const im=w.img,t=w.tc;if(t.width!==im.width){t.width=im.width;t.height=im.height}const g2=t.getContext('2d');
+  g2.clearRect(0,0,t.width,t.height);g2.globalCompositeOperation='source-over';g2.drawImage(im,0,0);g2.globalCompositeOperation='source-atop';
+  const step=Math.abs(dtLast*(spd/MAXSPD*KMH/3.6)/WR),P=15;
+  if(spd>20){const blur=step>.3,ph0=blur?Math.random()*P:(ph.spin*4.8)%P;
+    for(let yy=-P+ph0;yy<t.height;yy+=P){g2.fillStyle=blur?'rgba(140,150,175,.22)':'rgba(0,0,0,.34)';g2.fillRect(0,yy,t.width,blur?P:5);
+      if(!blur){g2.fillStyle='rgba(190,200,230,.16)';g2.fillRect(0,yy+9,t.width,3)}}}
+  g2.globalCompositeOperation='source-over';o2.drawImage(t,x,y);
+}
+function drawHD(k,g,cxp,cyb){
+  const R=HD[k];if(!hdReady||!R)return false;
+  const m=R.m,K=3,sc=CARW;
+  o2.save();o2.imageSmoothingEnabled=true;o2.imageSmoothingQuality='high';o2.translate(cxp*OVS,cyb*OVS);o2.scale(sc,sc);
+  const right=k==='l2'||k==='l3',dir=right?1:-1;
+  o2.save();o2.rotate(g.ang);o2.translate(0,-g.up*K);o2.drawImage(R.well,-m.w/2,-m.h);o2.restore();
+  for(const nm in R.wh){
+    const w=R.wh[nm],ph=WH[CORNER[k][nm]],r=w.r,zy=Math.round(ph.z)*K,x=-m.w/2+r.x,y=-m.h+r.y-zy;
+    if(k==='c')hdTread(w,ph,x,y);else o2.drawImage(w.img,x,y);
+    if(w.face){const f=r.face,sp=ph.spin*dir,step=Math.abs(dtLast*(spd/MAXSPD*KMH/3.6)/WR);
+      o2.save();o2.translate(-m.w/2+f.cx,-m.h+f.cy-zy);o2.rotate(f.tilt*Math.PI/180);o2.scale(f.a/f.b,1);
+      if(step>.3){for(let j=0;j<5;j++){o2.save();o2.rotate(sp+dir*j*(2*Math.PI/7)/5);o2.globalAlpha=.3;o2.drawImage(w.face,-f.S/2,-f.S/2);o2.restore()}}
+      else{o2.rotate(sp);o2.drawImage(w.face,-f.S/2,-f.S/2)}
+      o2.restore()}
+  }
+  o2.save();o2.rotate(g.ang);o2.translate(0,-g.up*K);o2.drawImage(R.body,-m.w/2,-m.h);
+  // luzes sobre a pintura: lanternas (freio forte), setas e farois
+  const T=LT[k],pc=spd/MAXSPD,brake=!!(key.b||(key.d&&pc>.2)),blink=Math.floor(t*3)%2===0,mw=g.w,P=pt=>[(pt[0]-mw/2)*K,(pt[1]-g.h)*K];
+  o2.globalCompositeOperation='lighter';
+  const gl=(img,pt,r,a)=>{const [x,y]=P(pt);o2.globalAlpha=a;o2.drawImage(img,x-r*K,y-r*K,2*r*K,2*r*K)};
+  for(const side of['L','R']){if(!T[side])continue;gl(GLW.red,T[side],brake?10:5,(lightsOn?(brake?1:.45):(brake?1:.15)));
+    if((side==='L'?(hazard||(sigT>0&&sigDir<0)):(hazard||(sigT>0&&sigDir>0)))&&blink)gl(GLW.amb,(side==='L'?T.aL:T.aR)||T[side],9,.95)}
+  if(lightsOn)for(const side of['L','R']){const h=T['H'+side];if(h){gl(GLW.wht,h,9,.8);gl(GLW.wht,h,4,.9)}}
+  o2.restore();o2.restore();o2.globalAlpha=1;return true;
 }
 let dtLast=1/60;
 // pneu visto de tras: a banda de rodagem "rola" para baixo (listras que acompanham o giro; em alta vira borrao)
@@ -697,7 +746,7 @@ function drawWorld(){
   if(W3.ready)W3.stream(wx,wz);
   if(!W3.ready||!wInit||!W3.tilesReady(wx,wz,8)){const pr=W3.ready?W3.progress():0;ctx.fillStyle='#8c93b8';ctx.font='10px monospace';ctx.fillText('carregando o mapa... '+Math.round(pr*100)+'%',W/2-70,H/2);ctx.fillStyle='#2a3050';ctx.fillRect(W/2-70,H/2+8,140,4);ctx.fillStyle='#8c93b8';ctx.fillRect(W/2-70,H/2+8,140*pr,4);return}
   const fx=Math.sin(hd),fz=Math.cos(hd),eh=foot?.095:cabv?.05:.11,back=foot?.2:cabv?0:.3,ah=W3.height(wx+fx*.7,wz+fz*.7,gy,.05),pit=ah===null?0:clamp(ah-gy,-.075,.075);pitS+=(pit-pitS)*.05;
-  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*1.5,gy+eh-.0015+pitS*.8,wz+fz*1.5]:foot?[wx+fx*.6,gy+.05+pitS*.3,wz+fz*.6]:[wx+fx*.75,gy+.06+pitS*.55,wz+fz*.75],fov:cabv?.95:.88,far:WFAR};
+  const cam={eye:[wx-fx*back,gy+eh,wz-fz*back],at:cabv?[wx+fx*1.5,gy+eh-.0015+pitS*.8,wz+fz*1.5]:foot?[wx+fx*.6,gy+.05+pitS*.3,wz+fz*.6]:[wx+fx*.75,gy+.06+pitS*.55,wz+fz*.75],fov:cabv?.95:.78,far:WFAR};
   W3.dynBegin();Trafego.draw(W3,{x:wx,z:wz},t,gy);if(foot)drawActor();
   W3.light={d:TOD.d,c:TOD.sunC,night};
   W3.render(cam,{p:[wx,gy,wz],fwd:[fx,fz],head:lightsOn&&!foot?.08+.92*night:0},[HAZE[0]/255,HAZE[1]/255,HAZE[2]/255],TOD.amb,t);
@@ -773,6 +822,7 @@ function render(){
   const m=Math.max(Math.abs(steer)*.55,Math.abs(slip)),sd=Math.abs(slip)>.05?Math.sign(slip):Math.sign(steer);
   let nl=Math.abs(slip)>(lvl===3?.45:.6)?3:(m>(lvl>=2?.2:.3)?2:0);lvl=nl;
   const ks=lvl===3?(sd>0?'l3':'r3'):lvl===2?(sd>0?'l2':'r2'):'c';
+  o2.clearRect(0,0,c2.width,c2.height);
   if(cab||foot){}else if(rigReady&&RIG[ks]){
     const g=drawRig(ks),cxp=W/2+Math.round(steer*4+slip*12),cyb=H-30+Math.round((Math.random()-.5)*sp*2);
     const dx0=Math.round(cxp-CVW/2),dy0=cyb-(100-10);
@@ -780,7 +830,8 @@ function render(){
     if(!WORLD)beams(cxp,cyb);
     ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(cxp-g.w/2+6,cyb-3,g.w-12,5);
     ctx.save();ctx.globalAlpha=.3;ctx.translate(0,cyb+cyb+2);ctx.scale(1,-1);ctx.drawImage(CARCV,dx0,dy0);ctx.restore();
-    ctx.drawImage(CARCV,dx0,dy0);
+    ctx.restore();ctx.save();ctx.translate(cxp,cyb);ctx.scale(WORLD?CARW:CARS,WORLD?CARW:CARS);ctx.translate(-cxp,-cyb);
+    if(!(WORLD&&drawHD(ks,g,cxp,cyb)))ctx.drawImage(CARCV,dx0,dy0);
     lights(ks,dx0,dy0,g);
     spray(dx0,dy0,ks);window.__carpos={dx0,dy0};
     ctx.restore();
@@ -800,12 +851,13 @@ function render(){
 }
 // filtro pixel-art: paleta reduzida + dither ordenado
 const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v/16-.5)*16);
-const LV=10,QT=new Uint8ClampedArray(512);
+const LV=16,SAT=1.32,CON=1.1,QT=new Uint8ClampedArray(512);
 function post(){
   const id=ctx.getImageData(0,0,W,H),d=id.data;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const b=BAY[(y&3)*4+(x&3)],i=(y*W+x)*4;
-    for(let c=0;c<3;c++){const v=d[i+c]+b;d[i+c]=Math.round(clamp(v,0,255)/255*LV)/LV*255}
+    const gr=d[i]*.3+d[i+1]*.59+d[i+2]*.11;
+    for(let c=0;c<3;c++){let v=gr+(d[i+c]-gr)*SAT;v=(v-118)*CON+124+b;d[i+c]=Math.round(clamp(v,0,255)/255*LV)/LV*255}
   }
   ctx.putImageData(id,0,0);
 }
