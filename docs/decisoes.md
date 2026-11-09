@@ -98,3 +98,8 @@
 - A pé (tecla F / botão de pessoa): desce do carro parado (< 12 km/h), anda (seta/botão; N corre), volta ao carro perto dele. Boneco de blocos provisório; carro fica estacionado e o trânsito o enxerga.
 - Minimapa (tecla M / botão de pino): gira com o carro, ruas/grama/prédios, carros do trânsito em vermelho, carro estacionado em laranja; botão alterna 3 zoom e desliga.
 - Pendências: sprites dos NPCs (dele), túneis, postos, mapa mais longo (a combinar), prédios onde falta (a combinar).
+
+## Rodada de qualidade (09/11) - texturas
+- Causa dos "buracos/vazios": (1) 79 faces de chao usavam paginas de textura 128/158 que nao existem no zip do mapa (ficavam cinza); (2) ~48 mil vertices de chao usavam o texel azul-acinzentado criado para telhados (retangulos cinza em pracas).
+- Correcao: ferramentas/mapa/corrigir_texturas.py (rodar depois de preencher_buracos.py) remapeia essas faces para concreto/grama ja existentes no atlas. Nenhuma imagem original foi alterada.
+- Pendente desta rodada: carro em alta resolucao (rig-hires), zoom mais proximo, cores mais vivas/brilho, trecho de expansao do mapa, prompts de sprites.
