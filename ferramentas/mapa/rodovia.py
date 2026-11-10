@@ -6,7 +6,7 @@ from PIL import Image
 M=sys.argv[1] if len(sys.argv)>1 else '../../demos/mundo-aberto/mapa'
 c=json.load(open(M+'/tiles.json'));GW,L,CELL,x0,z0,T,OS,OW=c['GW'],c['LAY'],c['CELL'],c['x0'],c['z0'],c['T'],c['OS'],c['OW']
 GH0=c.setdefault('GH0',c['GH']);OH0=c.setdefault('OH0',c['OH'])
-LEN=120.0;N=int(round(LEN/CELL));NO=int(round(LEN/OS));GH=GH0+N;OH=OH0+NO;zs=z0+GH0*CELL
+LEN=150.0;N=int(round(LEN/CELL));NO=int(round(LEN/OS));GH=GH0+N;OH=OH0+NO;zs=z0+GH0*CELL
 c['tiles']=[t for t in c['tiles'] if not t['f'].startswith('r_')]
 # ---- dados originais (truncados em GH0) ----
 import os
@@ -31,19 +31,22 @@ at.save(M+'/atlas.png',optimize=True)
 # ---- eixo da rodovia ----
 BASE=x0+525*CELL
 def S(u,a,b):t=min(1,max(0,(u-a)/(b-a)));return t*t*(3-2*t)
-def xc(z):u=z-zs;return BASE+6*S(u,6,36)-8*S(u,90,120)
+def xc(z):u=z-zs;return BASE+6*S(u,6,36)-8*S(u,128,148)
+def Hh(z):u=z-zs;return .30*S(u,4,24)-.30*S(u,26,42)        # colinas
+def EV(z):u=z-zs;return .32*S(u,92,104)-.32*S(u,120,132)      # viaduto (rampa+tabuleiro)
+def HR(z):return Hh(z)+EV(z)
 def tang(z):e=.05;return math.atan2(xc(z+e)-xc(z-e),2*e)
 RH,GR=.012,.003                      # altura da pista e do chao
 MED,CAR,SHO,RAIL=.05,.38,.46,.50
 quads={}   # tile -> list of (4 pts, uvname, shade)
 def addq(p,tex,sh=255):
     ck=int((sum(q[0] for q in p)/4-x0)//T),int((sum(q[2] for q in p)/4-z0)//T);quads.setdefault(ck,[]).append((p,tex,sh))
-def strip(za,zb,oa,ob_,y,tex,sh=255):
+def strip(za,zb,oa,ob_,y,tex,sh=255,rel=True):
     p=[]
-    for z,o in ((za,oa),(za,ob_),(zb,ob_),(zb,oa)):p.append((xc(z)+o,y,z))
+    for z,o in ((za,oa),(za,ob_),(zb,ob_),(zb,oa)):p.append((xc(z)+o,y+(HR(z) if rel else 0),z))
     addq(p,tex,sh)
 def wall(za,zb,o,y0,y1,tex,sh=255):
-    addq([(xc(za)+o,y0,za),(xc(zb)+o,y0,zb),(xc(zb)+o,y1,zb),(xc(za)+o,y1,za)],tex,sh)
+    addq([(xc(za)+o,y0+HR(za),za),(xc(zb)+o,y0+HR(zb),zb),(xc(zb)+o,y1+HR(zb),zb),(xc(za)+o,y1+HR(za),za)],tex,sh)
 def box(cx,cz,w,d,y0,y1,tex,sh=255,roof=None):
     a,b,cc,dd=cx-w/2,cz-d/2,cx+w/2,cz+d/2
     addq([(a,y1,b),(cc,y1,b),(cc,y1,dd),(a,y1,dd)],roof or tex,sh)
@@ -79,6 +82,13 @@ for za,zb in zip(zl[:-1],zl[1:]):
         strip(za,zb,sg*(CAR-.008),sg*CAR,RH+.0008,'bra');strip(za,zb,sg*(MED+.004),sg*(MED+.012),RH+.0008,'ama')
 for k in range(0,len(zl)-1,2):
     for sg in(1,-1):strip(zl[k],zl[k]+.12,sg*(.215-.004),sg*(.215+.004),RH+.0008,'bra')
+# --- taludes (colinas e rampas do viaduto) fecham o vao entre a pista elevada e o chao
+def fillh(z):e=EV(z);return Hh(z)+(e if e<.12 else 0)
+for za,zb in zip(zl[:-1],zl[1:]):
+    fa,fb=fillh(za),fillh(zb)
+    if max(fa,fb)<.012:continue
+    for sg in(1,-1):
+        addq([(xc(za)+sg*SHO,RH+fa+GR*0,za),(xc(za)+sg*(SHO+.30),GR+0*fa,za),(xc(zb)+sg*(SHO+.30),GR,zb),(xc(zb)+sg*SHO,RH+fb,zb)],'grama',230)
 # --- guard-rails (menos na entrada do posto), colisao
 def rail_segments():
     out=[];a=zs
@@ -127,7 +137,7 @@ box(xp+.42,ST0-2,.012,.012,RH,.2,'poste')
 for k in range(0,int(LEN/1.2)):
     z=zs+2+k*1.2
     if TN0-.2<z<TN1+.2:continue
-    cx=xc(z);box(cx,z,.02,.02,RH,.2,'poste');box(cx,z,.07,.03,.2,.212,'lamp');obsbox(cx,z,.05,.05)
+    cx=xc(z);hr=HR(z);box(cx,z,.02,.02,RH+hr,.2+hr,'poste');box(cx,z,.07,.03,.2+hr,.212+hr,'lamp');obsbox(cx,z,.05,.05)
 rng=np.random.RandomState(11)
 for k in range(260):
     z=zs+3+rng.rand()*(LEN-6)
@@ -138,17 +148,40 @@ for k in range(260):
     box(cx,z,.02,.02,GR,h,'tronco');tr=.09+rng.rand()*.05;box(cx,z,tr,tr,h,h+tr,'folha' if rng.rand()<.6 else 'folha2');obsbox(cx,z,.04,.04)
 for zz in(zs+20,zs+95):                                  # placas verdes sobre o acostamento
     cx=xc(zz)+.58;box(cx,zz,.015,.02,GR,.12,'poste');box(cx,zz,.16,.015,.09,.16,'placa');obsbox(cx,zz,.04,.04)
+# --- viaduto: face inferior do tabuleiro, pilares, via transversal embaixo
+for za,zb in zip(zl[:-1],zl[1:]):
+    if EV((za+zb)/2)>.06:
+        strip(za,zb,-SHO-.02,SHO+.02,-.03,'concE',120)
+        for sg in(1,-1):wall(za,zb,sg*(SHO+.02),-.03,.0,'concE',140)
+for zz in np.arange(zs+104,zs+121,3.4):
+    for o in(-.58,0,.58):
+        cx=xc(zz)+o;box(cx,zz,.05,.05,GR,RH+EV(zz)-.03,'concE');obsbox(cx,zz,.07,.07)
+zx=zs+112                                                         # via transversal sob o viaduto
+for za in np.arange(zx-.3,zx+.3,.25):
+    addq([(xc(zx)-1.6,GR+.004,za),(xc(zx)+1.6,GR+.004,za),(xc(zx)+1.6,GR+.004,za+.25),(xc(zx)-1.6,GR+.004,za+.25)],'asf')
+for xo in np.arange(-1.6,1.6,.25):
+    addq([(xc(zx)+xo,GR+.0052,zx-.004),(xc(zx)+xo+.12,GR+.0052,zx-.004),(xc(zx)+xo+.12,GR+.0052,zx+.004),(xc(zx)+xo,GR+.0052,zx+.004)],'bra')
 # barreira de fim do prototipo
 box(xc(ZE-.2),ZE-.2,1.4,.1,RH,.1,'telhaV');obsbox(xc(ZE-.2),ZE-.2,1.5,.2);obsband(ZE-.6,ZE,-2,2)
 # ---- grid / road / top (raster) ----
 G[0,GH0:]=int(GR*1000)
 Zc=z0+(np.arange(GH0,GH)+.5)*CELL;Xc=x0+(np.arange(GW)+.5)*CELL
 XCz=np.array([xc(z) for z in Zc]);off=np.abs(Xc[None,:]-XCz[:,None])
-carr=(off>MED)&(off<SHO);G[0,GH0:][off<SHO]=int(RH*1000);G[0,GH0:][(off<MED)]=int((RH+.012)*1000)
+HRz=np.array([Hh(z) for z in Zc]);EVz=np.array([EV(z) for z in Zc]);HRc=(HRz+EVz)[:,None]
+road_h=(RH+HRz)[:,None]+0*off                                    # altura do chao na pista (colinas)
+slope=np.clip(1-(off-SHO)/.30,0,1)*((off>=SHO)&(off<SHO+.30))*(HRz[:,None]*(1)+np.where(EVz[:,None]<.12,EVz[:,None],0))  # talude
+Gh=np.where(off<SHO,road_h,GR+slope)
+Gh=np.where(off<MED,road_h+.012,Gh)
+vi=(EVz[:,None]>.04)&(off<SHO+.02)                                 # sob o viaduto: chao normal; tabuleiro na camada 1
+Gh=np.where(vi,GR,Gh)
+G[0,GH0:]=np.round(Gh*1000).astype(np.int16)
+deck=(EVz[:,None]>.002)&(off<SHO)
+G[1,GH0:][deck]=np.round((RH+HRc+0*off)[deck]*1000).astype(np.int16)
 RD[GH0:][(off>MED)&(off<CAR)]=1
+TPd=(EVz[:,None]>.04)&(off<SHO+.02)
 inpost=(Zc[:,None]>=ST0)&(Zc[:,None]<=ST1)&(Xc[None,:]-XCz[:,None]>SHO)&(Xc[None,:]-XCz[:,None]<SHO+.85);G[0,GH0:][inpost]=int(RH*1000)
 tun=(Zc[:,None]>=TN0)&(Zc[:,None]<=TN1)&(off<.56)
-TPv=np.full((N,GW),21,np.uint8);TPv[tun]=int((.23+.2)/2.4*255);TP[GH0:]=TPv
+TPv=np.full((N,GW),21,np.uint8);TPv[tun]=int((.23+.2)/2.4*255);TPv[TPd]=np.clip((RH+HRc+.2+0*off)[TPd]/2.4*255,0,255).astype(np.uint8);TP[GH0:]=TPv
 # emenda: preenche solo/pista nas ultimas linhas do mapa original (so onde esta vazio) para o carro passar sem parede
 for j in range(GH0-40,GH0):
     z=z0+(j+.5)*CELL;o=np.abs(Xc-BASE)

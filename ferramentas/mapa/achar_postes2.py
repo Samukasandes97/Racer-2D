@@ -10,7 +10,7 @@ for l in open(OBJ,errors='ignore'):
         if len(q)==4:F.append([q[0],q[2],q[3]]);FM.append(cur)
 V=np.array(V);F=np.array(F);FM=np.array(FM);P=V[F];inv={v:k for k,v in mats.items()}
 ext=P.max(1)-P.min(1);mnf=P.min(1)[:,1];mxf=P.max(1)[:,1]
-m=(ext[:,1]>.12)&(np.maximum(ext[:,0],ext[:,2])<.05)&(mnf<.25)
+m=(ext[:,1]>.07)&(np.maximum(ext[:,0],ext[:,2])<.05)&(mnf<.25)
 print('faces finas',m.sum())
 c=P[m].mean(1);top=mxf[m];bot=mnf[m];mm=FM[m]
 key=np.round(c[:,[0,2]]/.05).astype(int)
@@ -27,7 +27,7 @@ out=[]
 import collections
 cnt=collections.Counter(next(iter(v[5])) for v in L if v[2]>=.2 and v[2]-v[3]>=.12);print(cnt.most_common(8))
 for x,z,t,b,n,ms in L:
-    if t<.2 or t-b<.12:continue
+    if not(.14<=t<=.30 and 'page_0' in ms and t-b>=.1):continue
     ci,cj=int((x+111.975)/.1),int((z-32.0196)/.1)
-    if RD[max(0,cj-2):cj+3,max(0,ci-2):ci+3].any():out.append([round(float(x),3),round(float(z),3),round(float(t),3)])
+    if RD[max(0,cj-6):cj+7,max(0,ci-6):ci+7].any():out.append([round(float(x),3),round(float(z),3),round(float(t),3)])
 json.dump(out,open('../../demos/mundo-aberto/mapa/postes.json','w'),separators=(',',':'));print('postes.json',len(out))
