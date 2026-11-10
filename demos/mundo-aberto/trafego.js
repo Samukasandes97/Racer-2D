@@ -16,6 +16,9 @@ fetch('mapa/vias.json').then(r=>r.json()).then(v=>{
   for(const e of v.edges){nodes[e.a].wmax=Math.max(nodes[e.a].wmax,e.w);nodes[e.b].wmax=Math.max(nodes[e.b].wmax,e.w)}
   EDGES=v.edges;T.edges=EDGES;T.nodes=nodes;T.loaded=true;
 }).catch(e=>{T.error=String(e)});
+T.poles=[];T.pgrid=new Map();T.glow=[];
+fetch('mapa/postes.json').then(r=>r.json()).then(P=>{T.poles=P;for(const p of P){const k=Math.floor(p[0])+','+Math.floor(p[1]);(T.pgrid.get(k)||T.pgrid.set(k,[]).get(k)).push(p)}}).catch(()=>{});
+T.nearPole=function(x,z,r){let b=null,bd=r;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const a=T.pgrid.get((Math.floor(x)+i)+','+(Math.floor(z)+j));if(!a)continue;for(const p of a){if(p[3])continue;const d=Math.hypot(p[0]-x,p[1]-z);if(d<bd){bd=d;b=p}}}return b};
 // faixa deslocada p/ a direita do sentido de marcha (direita = (-dz, dx))
 function buildLane(e,dir,off){
   const P=e.p,pts=dir===1?P.map(p=>[p[0],p[1]]):P.slice().reverse().map(p=>[p[0],p[1]]);
@@ -199,6 +202,7 @@ T.draw=function(W3,pl,t,gy){
       W3.box(c.x+s*hl*.99-co*sd*w*.7,y+cl+ty.H*.6,c.z+co*hl*.99+s*sd*w*.7,.003,.005,.01,hd,1,.95,.75,1);
       const br=c.brake>.5;W3.box(c.x-s*hl*.99-co*sd*w*.7,y+cl+ty.H*.6,c.z-co*hl*.99+s*sd*w*.7,.003,.005,.01,hd,br?1:.7,br?.1:.05,br?.1:.05,br?1:.75)}
   }
+  T.glow.length=0;
   // semaforos: poste na calcada, no canto direito de quem chega, antes da faixa de pedestres
   const gx=Math.floor(pl.x/GS),gz=Math.floor(pl.z/GS),rr=Math.ceil(R/GS);
   for(let i=-rr;i<=rr;i++)for(let j=-rr;j<=rr;j++){const arr=grid.get((gx+i)+','+(gz+j));if(!arr)continue;
@@ -206,13 +210,14 @@ T.draw=function(W3,pl,t,gy){
       for(const l of n.in){const d=l.dir,rt=[-d[1],d[0]],st=T.light(n,l.grp,t);
         if(!l.pole){const bx=n.x-d[0]*l.stop,bz=n.z-d[1]*l.stop;let last=(l.off||.12)+.08;     // anda para a direita ate a borda da rua e coloca o poste na calcada
           for(let k=(l.off||.12)+.1;k<.9;k+=.02){const px=bx+rt[0]*k,pz=bz+rt[1]*k;if(W3.height(px,pz,0,.1)===null||W3.obs(px,pz)||!W3.road(px,pz))break;last=k}
-          l.pole=[bx+rt[0]*last,bz+rt[1]*last]}
+          l.pole=[bx+rt[0]*last,bz+rt[1]*last];const mp=T.nearPole(l.pole[0],l.pole[1],.16);if(mp){l.pole=[mp[0],mp[1]];l.mesh=mp[2]}}
         const [px,pz]=l.pole,hh=W3.height(px,pz,gy+.2,.2),y=hh===null?gy:hh;
-        W3.box(px,y+.09,pz,.003,.09,.003,0,.16,.16,.17,0);                                       // poste ~4,3 m
+        const top=l.mesh?l.mesh-.045:y+.2;                                                        // poste do mapa: caixa dos focos no topo dele
+        if(!l.mesh)W3.box(px,y+.09,pz,.003,.09,.003,0,.16,.16,.17,0);                             // poste proprio ~4,3 m (so onde o mapa nao tem)
         const hd=Math.atan2(-d[0],-d[1]);                                                         // cabeca olha para quem chega
-        W3.box(px,y+.2,pz,.01,.027,.01,hd,.04,.04,.045,0);                                        // caixa dos focos
-        const lamp=(k,col,on)=>W3.box(px-d[0]*.0105,y+.2+k*.017,pz-d[1]*.0105,.0035,.0065,.0065,hd,col[0]*(on?1:.18),col[1]*(on?1:.18),col[2]*(on?1:.18),on?1:0);
-        lamp(1,[1,.1,.1],st==='R');lamp(0,[1,.8,.05],st==='Y');lamp(-1,[.1,1,.25],st==='G')}}}
+        W3.box(px,top,pz,.012,.03,.012,hd,.04,.04,.045,0);                                        // caixa dos focos
+        const lamp=(k,col,on,nm)=>{const lx=px-d[0]*.0125,ly=top+k*.019,lz=pz-d[1]*.0125;W3.box(lx,ly,lz,.004,.0075,.0075,hd,col[0]*(on?1:.18),col[1]*(on?1:.18),col[2]*(on?1:.18),on?1:0);if(on)T.glow.push([lx,ly,lz,nm])};
+        lamp(1,[1,.1,.1],st==='R','red');lamp(0,[1,.8,.05],st==='Y','amb');lamp(-1,[.1,1,.25],st==='G','grn')}}}
 };
 T.max=30;T.TYPES=TYPES;
 })();

@@ -7,6 +7,10 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;overflow:hidden;overscroll-behavior:none}
 .app{height:100dvh;display:flex;flex-direction:column;gap:8px;padding:6px max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
 .stage{position:relative;flex:0 0 auto;width:100%;aspect-ratio:16/9;max-height:46dvh;margin:0 auto;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0a0f24;touch-action:none;user-select:none;-webkit-user-select:none}
+body.ui-off .tg,body.ui-off .msg{display:none!important}
+.hb{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--line);background:rgba(16,21,42,.55);color:var(--cyan);display:grid;place-items:center;padding:0;z-index:5}
+.hb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+body.ui-off .hb{color:var(--muted)}
 #c2{position:absolute;left:0;top:0;image-rendering:auto;pointer-events:none}
 canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .hud{position:absolute;right:8px;top:6px;font-family:ui-monospace,monospace;font-size:clamp(11px,3vw,17px);text-shadow:0 0 6px var(--neon);font-variant-numeric:tabular-nums;text-align:right;pointer-events:none}
@@ -50,6 +54,7 @@ button:active,button.on{background:var(--neon);border-color:var(--neon);color:#1
   <div class="stage" id="stage">
     <canvas id="c" aria-label="Carro laranja correndo numa rua de Shibuya à noite, na chuva"></canvas>
     <canvas id="c2" aria-hidden="true"></canvas>
+    <button id="hb" class="hb" title="Ocultar/mostrar ícones" aria-label="Ocultar ou mostrar ícones" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
     <div class="hud" id="hud">0<small>km/h</small></div>
     <div class="msg" id="msg">teclado: setas/WASD · Espaço freio de mão · N nitro · E/Z marcha · C câmera</div>
   </div>
@@ -421,23 +426,28 @@ function drawActor(){
   B(-sw*.9,.0165,.045,.0045,.0165,.0045,.8,.37,.09);B(sw*.9,-.0165,.045,.0045,.0165,.0045,.8,.37,.09); // bracos
   B(0,0,.0685,.0078,.0085,.0078,.9,.7,.55);B(-.0025,0,.0715,.0082,.0075,.0088,.1,.07,.05)}             // cabeca e cabelo
 // ---- minimapa (GPS): rua, calcada/grama, predios; gira com o carro; toque no botao muda o zoom
-const MMS=64,mmC=document.createElement('canvas');mmC.width=mmC.height=MMS;const mmX=mmC.getContext('2d'),mmI=mmX.createImageData(MMS,MMS);
+let MMS=64,mmC=document.createElement('canvas'),mmX,mmI,mmBig=false,mmFr=0;
+function mmAlloc(n){MMS=n;mmC.width=mmC.height=n;mmX=mmC.getContext('2d');mmI=mmX.createImageData(n,n);mmFr=0}mmAlloc(64);
 function drawMini(){
   const W3=World3D;if(!mmOn||!W3.ready||!wInit)return;
-  const u=[.1,.2,.4][mmLv],f=[Math.sin(hd),Math.cos(hd)],r=[-Math.cos(hd),Math.sin(hd)],d=mmI.data;
+  const want=mmBig?128:64;if(MMS!==want)mmAlloc(want);
+  const u=[.1,.2,.4][mmLv]*(mmBig?1.5:1),f=[Math.sin(hd),Math.cos(hd)],r=[-Math.cos(hd),Math.sin(hd)],d=mmI.data;
+  if(!mmBig||(mmFr++%3)===0){
   for(let py=0;py<MMS;py++)for(let px=0;px<MMS;px++){
     const dx=(px-MMS/2+.5)*u,dy=(py-MMS/2+.5)*u,x=wx+r[0]*dx-f[0]*dy,z=wz+r[1]*dx-f[1]*dy,k=(py*MMS+px)*4;
     const h=W3.height(x,z,9,0);let R,G,B;
     if(h===null){R=34;G=37;B=52}else if(W3.road(x,z)){const e=h>gy+.08?1:h<gy-.08?-1:0;R=e>0?236:e<0?120:178;G=e>0?224:e<0?126:184;B=e>0?170:e<0?150:200}else{R=58;G=96;B=62}
     d[k]=R;d[k+1]=G;d[k+2]=B;d[k+3]=255}
-  mmX.putImageData(mmI,0,0);
-  const cx=40,cy=40,rad=32;ctx.save();ctx.beginPath();ctx.arc(cx,cy,rad,0,6.3);ctx.clip();ctx.globalAlpha=.92;ctx.drawImage(mmC,cx-rad,cy-rad);ctx.globalAlpha=1;
-  for(const c of Trafego.cars){const dx=c.x-wx,dz=c.z-wz,sx=(dx*r[0]+dz*r[1])/u,sy=-(dx*f[0]+dz*f[1])/u;if(sx*sx+sy*sy>rad*rad)continue;ctx.fillStyle='#e0554a';ctx.fillRect(cx+Math.round(sx)-1,cy+Math.round(sy)-1,2,2)}
-  if(foot&&pcar){const dx=pcar.x-wx,dz=pcar.z-wz,sx=(dx*r[0]+dz*r[1])/u,sy=-(dx*f[0]+dz*f[1])/u;ctx.fillStyle='#ff9a2e';ctx.fillRect(cx+Math.round(sx)-2,cy+Math.round(sy)-2,4,4)}
+  mmX.putImageData(mmI,0,0)}
+  const rad=mmBig?Math.min(H/2-10,W/2-10):32,cx=mmBig?W/2:40,cy=mmBig?H/2:40,ks=rad/(MMS/2),dot=mmBig?2:1;
+  ctx.save();ctx.beginPath();ctx.arc(cx,cy,rad,0,6.3);ctx.clip();ctx.globalAlpha=mmBig?.97:.92;ctx.imageSmoothingEnabled=false;ctx.drawImage(mmC,cx-rad,cy-rad,2*rad,2*rad);ctx.globalAlpha=1;
+  for(const c of Trafego.cars){const dx=c.x-wx,dz=c.z-wz,sx=(dx*r[0]+dz*r[1])/u*ks,sy=-(dx*f[0]+dz*f[1])/u*ks;if(sx*sx+sy*sy>rad*rad)continue;ctx.fillStyle='#e0554a';ctx.fillRect(cx+Math.round(sx)-dot,cy+Math.round(sy)-dot,dot*2,dot*2)}
+  if(foot&&pcar){const dx=pcar.x-wx,dz=pcar.z-wz,sx=(dx*r[0]+dz*r[1])/u*ks,sy=-(dx*f[0]+dz*f[1])/u*ks;ctx.fillStyle='#ff9a2e';ctx.fillRect(cx+Math.round(sx)-2,cy+Math.round(sy)-2,4,4)}
   ctx.restore();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(cx,cy-5);ctx.lineTo(cx+3.5,cy+3.5);ctx.lineTo(cx,cy+1.5);ctx.lineTo(cx-3.5,cy+3.5);ctx.closePath();ctx.fill();ctx.strokeStyle='#06141c';ctx.lineWidth=1;ctx.stroke();
+  const q=mmBig?1.6:1;ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(cx,cy-5*q);ctx.lineTo(cx+3.5*q,cy+3.5*q);ctx.lineTo(cx,cy+1.5*q);ctx.lineTo(cx-3.5*q,cy+3.5*q);ctx.closePath();ctx.fill();ctx.strokeStyle='#06141c';ctx.lineWidth=1;ctx.stroke();
   ctx.strokeStyle='rgba(6,20,28,.95)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,rad,0,6.3);ctx.stroke();ctx.strokeStyle='#9fe8ff';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,rad-1,0,6.3);ctx.stroke();
-  ctx.fillStyle='#fff';ctx.font='bold 7px monospace';ctx.fillText('N',cx-2+Math.round(-Math.sin(-hd)*(rad-6)*0)-0,cy-rad+8)}
+  ctx.fillStyle='#fff';ctx.font='bold 7px monospace';ctx.fillText('N',cx-2,cy-rad+8);
+  if(mmBig){ctx.font='bold 8px monospace';ctx.textAlign='center';ctx.fillStyle='rgba(6,20,28,.7)';ctx.fillRect(W/2-70,cy+rad-16,140,13);ctx.fillStyle='#9fe8ff';ctx.fillText('toque para fechar · botao do mapa: zoom',W/2,cy+rad-6);ctx.textAlign='left'}}
 function drawFootHint(){
   if(!foot)return;ctx.font='bold 9px monospace';ctx.textAlign='center';
   const near=pcar&&Math.hypot(wx-pcar.x,wz-pcar.z)<.14,tx=footMsg>0?footTxt:near?'F / botão: entrar no carro':'';
@@ -622,7 +632,7 @@ function physKick(p){BODY.pv+=p}
 // ---------- iluminacao e escapamento ----------
 const mkG=rgb=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');
   const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba('+rgb+',1)');gr.addColorStop(.25,'rgba('+rgb+',.55)');gr.addColorStop(1,'rgba('+rgb+',0)');g.fillStyle=gr;g.fillRect(0,0,64,64);return c};
-const GLW={red:mkG('255,40,35'),amb:mkG('255,168,40'),wht:mkG('255,244,214'),org:mkG('255,150,40')};
+const GLW={grn:mkG('60,255,110'),red:mkG('255,40,35'),amb:mkG('255,168,40'),wht:mkG('255,244,214'),org:mkG('255,150,40')};
 const glow=(img,x,y,r,a)=>{ctx.globalAlpha=a;ctx.drawImage(img,Math.round(x-r),Math.round(y-r),Math.round(2*r),Math.round(2*r))};
 // pontos de luz e escapamento em cada vista (coordenadas do sprite na escala do jogo); L/R = lado do carro
 const LT={
@@ -739,6 +749,17 @@ function drawSkyBodies(cam,dy){
   if(TOD.moon[1]>-.05){body(TOD.moon,6,'#e9efff','rgba(150,180,255,.35)');const q=World3D.project(cam,[cam.eye[0]+TOD.moon[0]*400,cam.eye[1]+TOD.moon[1]*400,cam.eye[2]+TOD.moon[2]*400]);
     if(q[2]>0){ctx.fillStyle='rgba(120,135,175,.35)';ctx.fillRect(q[0]-2,q[1]-dy-1,2,2);ctx.fillRect(q[0]+1,q[1]-dy+1,2,1)}}
 }
+function glowAt(cam,p,img,r,a){const q=W3g.project(cam,p);if(q[2]<=.02)return;const k=Math.min(70,r*(135/Math.tan(cam.fov/2))/q[2]);if(k<1.2)return;ctx.globalAlpha=a;ctx.drawImage(img,q[0]-k,q[1]-k,2*k,2*k)}
+const W3g=World3D;
+function worldLights(cam){                                  // luz dos postes (noite) e dos focos dos semaforos
+  const T=Trafego;ctx.save();ctx.globalCompositeOperation='lighter';
+  for(const g of T.glow)glowAt(cam,[g[0],g[1],g[2]],GLW[g[3]],.012,.95);
+  if(night>.15&&T.pgrid){const gx=Math.floor(wx),gz=Math.floor(wz);
+    for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const a=T.pgrid.get((gx+i)+','+(gz+j));if(!a)continue;
+      for(const p of a){const dx=p[0]-wx,dz=p[1]-wz,d=Math.hypot(dx,dz);if(d>1.6||dx*Math.sin(hd)+dz*Math.cos(hd)<-.15)continue;
+        glowAt(cam,[p[0],p[2]-.005,p[1]],GLW.org,p[3]?.05:.032,Math.min(1,night*1.2)*(1-d/1.7));
+        glowAt(cam,[p[0],p[2]-(p[3]?.38:.2),p[1]],GLW.org,p[3]?.11:.07,.16*night*(1-d/1.7))}}}   // halo no topo + poca de luz no chao
+  ctx.restore();ctx.globalAlpha=1}
 function drawWorld(){
   const W3=World3D,cabv=view==='cab'&&!foot;
   updateTOD();adaptQuality();
@@ -760,6 +781,7 @@ function drawWorld(){
   ctx.restore();
   ctx.fillStyle='rgb('+HAZE.map(Math.round)+')';ctx.fillRect(0,Math.max(0,hzY),W,H-hzY);
   ctx.drawImage(W3.canvas,0,0);
+  worldLights(cam);
 }
 function render(){
   const cab=view==='cab'&&ckReady&&!foot,sp=clamp((vkmh()-100)/80,0,1),wfx=!cab&&sp>.01;
@@ -1031,6 +1053,11 @@ const hold=(id,k)=>{const b=document.getElementById(id);
   const on=e=>{e.preventDefault();key[k]=1;b.classList.add('on');msg.style.opacity=0};
   const off=()=>{key[k]=0;b.classList.remove('on')};
   b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off))};
+{const cvs=document.getElementById('c');cvs.addEventListener('click',e=>{if(!mmOn||!WORLD)return;const r=cvs.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;
+  if(mmBig){mmBig=false;return}if(Math.hypot(x-40,y-40)<=36){mmBig=true}})}
+{const hb=document.getElementById('hb'),ap=()=>{hb.setAttribute('aria-pressed',document.body.classList.contains('ui-off'))};
+ try{if(localStorage.getItem('uiOff')==='1')document.body.classList.add('ui-off')}catch(e){}ap();
+ hb.onclick=()=>{document.body.classList.toggle('ui-off');ap();try{localStorage.setItem('uiOff',document.body.classList.contains('ui-off')?'1':'0')}catch(e){}}}
 document.getElementById('tp').onclick=toggleFoot;{const b=document.getElementById('tm');b.onclick=()=>{if(mmOn&&mmLv<2)mmLv++;else if(mmOn){mmOn=false;mmLv=0}else mmOn=true;b.classList.toggle('on',mmOn);b.setAttribute('aria-pressed',mmOn)}}
 document.getElementById('gu').onclick=()=>shiftTo(1);document.getElementById('gd').onclick=()=>shiftTo(-1);hold('bn','n');hold('bl','l');hold('br','r');hold('bb','b');hold('ba','a');hold('bd','d');
 const km={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowDown:'b',s:'b',S:'b',ArrowUp:'a',w:'a',W:'a',' ':'d'};

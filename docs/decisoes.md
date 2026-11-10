@@ -107,3 +107,5 @@
 - Camera mais perto (fov .88 -> .78, carro com o mesmo tamanho de tela). Pos-processamento mais vivo: 16 niveis, saturacao 1.32, contraste 1.1.
 - Rodovia nova (09/11): ferramentas/mapa/rodovia.py (rodar por ultimo no pipeline) acrescenta 120 unidades (~2,9 km) ao fim do mapa: pista dupla com canteiro e guard-rails, 2 curvas, tunel (z+66..88), posto de gasolina (lado direito, z+45..62), postes, 260 arvores, placas, barreira no fim. Estende grid (dividido em grid.wav + grid2.wav por limite de 15 MB), obs, road, top; novos tiles r_*.wav; novos nos/arestas em vias.json (transito sobe a rodovia).
 - Camera ainda mais perto (fov .68, distancia .22).
+- UI (10/11): botao do olho (canto inferior direito) oculta/mostra os icones (lembra a escolha); toque no minimapa o aumenta (toque de novo fecha; botao do mapa troca o zoom).
+- Luz dos postes do mapa a noite (mapa/postes.json, gerado por ferramentas/mapa/achar_postes2.py: postes detectados pela geometria perto das ruas; limitacao: alguns postes curvos nao foram reconhecidos) e focos dos semaforos com brilho colorido; semaforo "snapa" no poste do mapa quando existe um perto, senao usa poste proprio.
