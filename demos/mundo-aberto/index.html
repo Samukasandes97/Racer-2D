@@ -1082,6 +1082,9 @@ const hold=(id,k)=>{const b=document.getElementById(id);
  cvs.addEventListener('wheel',e=>{if(!mmBig)return;e.preventDefault();mmBz=Math.max(0,Math.min(MMBU.length-1,mmBz+(e.deltaY>0?1:-1)))},{passive:false})}
 document.getElementById('tp').onclick=toggleFoot;{const b=document.getElementById('tm');b.onclick=()=>{if(mmOn&&mmLv<2)mmLv++;else if(mmOn){mmOn=false;mmLv=0}else mmOn=true;b.classList.toggle('on',mmOn);b.setAttribute('aria-pressed',mmOn)}}
 document.getElementById('gu').onclick=()=>shiftTo(1);document.getElementById('gd').onclick=()=>shiftTo(-1);hold('bn','n');hold('bl','l');hold('br','r');hold('bb','b');hold('ba','a');hold('bd','d');
+{const hb=document.getElementById('hb'),ap=()=>{hb.setAttribute('aria-pressed',document.body.classList.contains('ui-off'))};
+ try{if(localStorage.getItem('uiOff')==='1')document.body.classList.add('ui-off')}catch(e){}ap();
+ hb.onclick=()=>{document.body.classList.toggle('ui-off');ap();try{localStorage.setItem('uiOff',document.body.classList.contains('ui-off')?'1':'0')}catch(e){}}}
 const km={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowDown:'b',s:'b',S:'b',ArrowUp:'a',w:'a',W:'a',' ':'d'};
 addEventListener('keydown',e=>{if(km[e.key]){key[km[e.key]]=1;msg.style.opacity=0;e.preventDefault()}});
 addEventListener('keyup',e=>{if(km[e.key])key[km[e.key]]=0});
